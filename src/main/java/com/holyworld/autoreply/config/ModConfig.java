@@ -2,18 +2,15 @@ package com.holyworld.autoreply.config;
 
 public class ModConfig {
     public enum CheckState { IDLE, WAITING_FOR_CHECK, CHECK_ACTIVE }
-    
-    // Settings
+
     private boolean autoReply = true;
     private boolean autoBan = true;
     private boolean autoReports = false;
     private boolean autoOut = false;
 
-    // State
     private CheckState checkState = CheckState.IDLE;
     private String checkedPlayerName = "";
 
-    // Toggles
     public boolean isAutoReply() { return autoReply; }
     public void toggleAutoReply() { autoReply = !autoReply; }
 
@@ -26,25 +23,24 @@ public class ModConfig {
     public boolean isAutoOut() { return autoOut; }
     public void toggleAutoOut() { autoOut = !autoOut; }
 
-    // Logic
     public CheckState getCheckState() { return checkState; }
     public String getCheckedPlayerName() { return checkedPlayerName; }
 
-    public void startWaiting() { 
-        checkState = CheckState.WAITING_FOR_CHECK; 
-        checkedPlayerName = ""; 
+    public void startWaiting() {
+        checkState = CheckState.WAITING_FOR_CHECK;
+        checkedPlayerName = "";
     }
-    
-    public void activateCheck(String name) { 
-        checkState = CheckState.CHECK_ACTIVE; 
-        checkedPlayerName = name; 
+
+    public void activateCheck(String name) {
+        checkState = CheckState.CHECK_ACTIVE;
+        checkedPlayerName = name;
     }
-    
-    public void endCheck() { 
-        checkState = CheckState.IDLE; 
-        checkedPlayerName = ""; 
+
+    public void endCheck() {
+        checkState = CheckState.IDLE;
+        checkedPlayerName = "";
     }
-    
+
     public boolean isCheckActive() { return checkState == CheckState.CHECK_ACTIVE; }
     public boolean isWaiting() { return checkState == CheckState.WAITING_FOR_CHECK; }
     public boolean isIdle() { return checkState == CheckState.IDLE; }

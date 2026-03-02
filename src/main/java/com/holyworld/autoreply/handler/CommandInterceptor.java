@@ -6,29 +6,32 @@ import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 
 public class CommandInterceptor {
     public CommandInterceptor() {
-        ClientSendMessageEvents.COMMAND.register(this::handle);
+        ClientSendMessageEvents.ALLOW_COMMAND.register(command -> {
+            handleCommand(command);
+            return true;
+        });
     }
 
-    private void handle(String command) {
+    private void handleCommand(String command) {
+        if (command == null) return;
         String lower = command.toLowerCase().trim();
         ModConfig cfg = HolyWorldAutoReply.getConfig();
 
-        // Trigger: /hm spyfrz (no args)
+        HolyWorldAutoReply.LOGGER.info("[HW] Command: /{}", command);
+
         if (lower.equals("hm spyfrz") || lower.startsWith("hm spyfrz ")) {
             cfg.startWaiting();
             HolyWorldAutoReply.getChatHandler().resetState();
-            HolyWorldAutoReply.LOGGER.info("[HW] Waiting for [CHECK]...");
+            HolyWorldAutoReply.LOGGER.info("[HW] State -> WAITING_FOR_CHECK");
         }
-        
-        // Stop: /hm sban..., /hm unfrz...
-        else if (lower.startsWith("hm sban") || 
-                 lower.startsWith("hm unfrz") || 
-                 lower.startsWith("hm unfreezing") || 
+        else if (lower.startsWith("hm sban") ||
+                 lower.startsWith("hm unfrz") ||
+                 lower.startsWith("hm unfreezing") ||
                  lower.startsWith("banip")) {
-            
             if (!cfg.isIdle()) {
-                HolyWorldAutoReply.LOGGER.info("[HW] Check Ended.");
+                HolyWorldAutoReply.LOGGER.info("[HW] State -> IDLE (ended by command)");
                 cfg.endCheck();
+                HolyWorldAutoReply.getChatHandler().resetState();
             }
         }
     }

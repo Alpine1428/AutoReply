@@ -1,2 +1,3 @@
 #!/bin/sh
-exit 0
+echo "Use 'gradle' directly or install wrapper with 'gradle wrapper'"
+exit 1

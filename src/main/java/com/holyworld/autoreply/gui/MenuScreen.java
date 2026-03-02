@@ -14,48 +14,52 @@ public class MenuScreen extends Screen {
     protected void init() {
         super.init();
         ModConfig cfg = HolyWorldAutoReply.getConfig();
-        int cx = width/2;
-        int sy = height/2 - 70;
+        int cx = width / 2;
+        int sy = height / 2 - 70;
         int w = 220;
         int h = 20;
         int g = 24;
 
         addDrawableChild(ButtonWidget.builder(Text.literal(getTxt("Auto Reply", cfg.isAutoReply())), b -> {
-            cfg.toggleAutoReply(); b.setMessage(Text.literal(getTxt("Auto Reply", cfg.isAutoReply())));
-        }).dimensions(cx-w/2, sy, w, h).build());
+            cfg.toggleAutoReply();
+            b.setMessage(Text.literal(getTxt("Auto Reply", cfg.isAutoReply())));
+        }).dimensions(cx - w / 2, sy, w, h).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal(getTxt("Auto Ban", cfg.isAutoBan())), b -> {
-            cfg.toggleAutoBan(); b.setMessage(Text.literal(getTxt("Auto Ban", cfg.isAutoBan())));
-        }).dimensions(cx-w/2, sy+g, w, h).build());
+            cfg.toggleAutoBan();
+            b.setMessage(Text.literal(getTxt("Auto Ban", cfg.isAutoBan())));
+        }).dimensions(cx - w / 2, sy + g, w, h).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal(getTxt("Auto Reports", cfg.isAutoReports())), b -> {
-            cfg.toggleAutoReports(); b.setMessage(Text.literal(getTxt("Auto Reports", cfg.isAutoReports())));
-        }).dimensions(cx-w/2, sy+g*2, w, h).build());
+            cfg.toggleAutoReports();
+            b.setMessage(Text.literal(getTxt("Auto Reports", cfg.isAutoReports())));
+        }).dimensions(cx - w / 2, sy + g * 2, w, h).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal(getTxt("Auto Out", cfg.isAutoOut())), b -> {
-            cfg.toggleAutoOut(); b.setMessage(Text.literal(getTxt("Auto Out", cfg.isAutoOut())));
-        }).dimensions(cx-w/2, sy+g*3, w, h).build());
+            cfg.toggleAutoOut();
+            b.setMessage(Text.literal(getTxt("Auto Out", cfg.isAutoOut())));
+        }).dimensions(cx - w / 2, sy + g * 3, w, h).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), b -> close())
-            .dimensions(cx-w/2, sy+g*5, w, h).build());
+            .dimensions(cx - w / 2, sy + g * 5, w, h).build());
     }
 
     @Override
-    public void render(DrawContext ctx, int mx, int my, float d) {
+    public void render(DrawContext ctx, int mx, int my, float delta) {
         renderBackground(ctx);
         ModConfig cfg = HolyWorldAutoReply.getConfig();
-        
-        ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7b\u00a7lHolyWorld v7.0", width/2, height/2-100, -1);
-        
-        String st = "\u00a7c\u25CB IDLE";
-        if(cfg.isWaiting()) st = "\u00a7e\u25CF WAITING for [CHECK]";
-        if(cfg.isCheckActive()) st = "\u00a7a\u25CF ACTIVE: " + cfg.getCheckedPlayerName();
-        
-        ctx.drawCenteredTextWithShadow(textRenderer, st, width/2, height/2-85, -1);
-        super.render(ctx, mx, my, d);
+
+        ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7b\u00a7lHolyWorld v7.0", width / 2, height / 2 - 100, -1);
+
+        String status = "\u00a7c\u25CB IDLE";
+        if (cfg.isWaiting()) status = "\u00a7e\u25CF WAITING for [CHECK]";
+        if (cfg.isCheckActive()) status = "\u00a7a\u25CF ACTIVE: " + cfg.getCheckedPlayerName();
+
+        ctx.drawCenteredTextWithShadow(textRenderer, status, width / 2, height / 2 - 85, -1);
+        super.render(ctx, mx, my, delta);
     }
 
-    private String getTxt(String n, boolean v) {
-        return (v ? "\u00a7aON" : "\u00a7cOFF") + " \u00a77| " + n;
+    private String getTxt(String name, boolean value) {
+        return (value ? "\u00a7aON" : "\u00a7cOFF") + " \u00a77| " + name;
     }
 }

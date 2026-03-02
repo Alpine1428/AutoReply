@@ -3,7 +3,14 @@
   "id": "holyworld-autoreply",
   "version": "${version}",
   "name": "HolyWorld AutoReply",
-  "description": "Stable Moderation Assistant",
-  "entrypoints": { "client": ["com.holyworld.autoreply.HolyWorldAutoReply"] },
-  "depends": { "fabricloader": ">=0.14.0", "minecraft": "~1.20.1", "java": ">=17", "fabric-api": "*" }
+  "description": "Stable Moderation Assistant v7.1",
+  "entrypoints": {
+    "client": ["com.holyworld.autoreply.HolyWorldAutoReply"]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
 }

@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 public class HolyWorldAutoReply implements ClientModInitializer {
     public static final String MOD_ID = "holyworld-autoreply";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    
+
     private static ModConfig config;
     private static ChatHandler chatHandler;
     private static CommandInterceptor commandInterceptor;
@@ -25,22 +25,28 @@ public class HolyWorldAutoReply implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[HW] v7.0 (Stable + Menu)");
+        LOGGER.info("[HW] v7.0 Initializing...");
+
         config = new ModConfig();
         chatHandler = new ChatHandler();
         commandInterceptor = new CommandInterceptor();
-        
+
         AICommand.register();
-        
+
         menuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "HolyWorld Menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "HW AutoReply"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (menuKey.wasPressed()) {
-                if (client.currentScreen == null) client.setScreen(new MenuScreen());
+                if (client.currentScreen == null) {
+                    client.setScreen(new MenuScreen());
+                }
             }
         });
+
+        LOGGER.info("[HW] v7.0 Initialized successfully!");
+        LOGGER.info("[HW] AutoReply={}, AutoBan={}", config.isAutoReply(), config.isAutoBan());
     }
 
     public static ModConfig getConfig() { return config; }
