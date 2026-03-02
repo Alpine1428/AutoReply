@@ -29,5 +29,5 @@ jobs:
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: HolyWorldAutoReply-v7.1
+          name: HolyWorldAutoReply-v2.0
           path: build/libs/*.jar

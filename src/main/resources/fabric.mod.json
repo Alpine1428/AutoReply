@@ -3,12 +3,20 @@
   "id": "holyworld-autoreply",
   "version": "${version}",
   "name": "HolyWorld AutoReply",
-  "description": "Stable Moderation Assistant v7.1",
+  "description": "Auto reply for HolyWorld moderators v2.0",
+  "authors": ["HolyWorld"],
+  "license": "MIT",
+  "environment": "client",
   "entrypoints": {
-    "client": ["com.holyworld.autoreply.HolyWorldAutoReply"]
+    "client": [
+      "com.holyworld.autoreply.HolyWorldAutoReply"
+    ]
   },
+  "mixins": [
+    "holyworld-autoreply.mixins.json"
+  ],
   "depends": {
-    "fabricloader": ">=0.14.0",
+    "fabricloader": ">=0.15.0",
     "minecraft": "~1.20.1",
     "java": ">=17",
     "fabric-api": "*"

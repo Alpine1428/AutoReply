@@ -3,174 +3,217 @@ package com.holyworld.autoreply.handler;
 import com.holyworld.autoreply.HolyWorldAutoReply;
 import com.holyworld.autoreply.ai.ResponseEngine;
 import com.holyworld.autoreply.config.ModConfig;
-import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.minecraft.client.MinecraftClient;
+
 import java.util.concurrent.*;
-import java.util.regex.*;
 
 public class ChatHandler {
-    private final ResponseEngine engine = new ResponseEngine();
-    private final ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor();
 
-    private final Pattern P = Pattern.compile(
-        "\\[CHECK\\]\\s*([a-zA-Z0-9_]{2,16})\\s*(?:->|:|>>)\\s*(.+)"
-    );
-
-    private final ConcurrentHashMap<String, Long> cd = new ConcurrentHashMap<>();
-    private boolean warned = false;
+    private final ResponseEngine responseEngine;
+    private final ScheduledExecutorService scheduler;
+    private final ConcurrentHashMap<String, Long> cooldowns = new ConcurrentHashMap<>();
+    private static final long COOLDOWN_MS = 2500;
 
     public ChatHandler() {
-        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
-            try {
-                String raw = message.getString();
-                HolyWorldAutoReply.LOGGER.debug("[HW-GAME] overlay={} raw: {}", overlay, raw);
-                process(raw);
-            } catch (Exception e) {
-                HolyWorldAutoReply.LOGGER.error("[HW] Error in GAME handler", e);
-            }
+        this.responseEngine = new ResponseEngine();
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "HW-AutoReply");
+            t.setDaemon(true);
+            return t;
         });
-
-        ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
-            try {
-                String raw = message.getString();
-                HolyWorldAutoReply.LOGGER.debug("[HW-CHAT] raw: {}", raw);
-                process(raw);
-            } catch (Exception e) {
-                HolyWorldAutoReply.LOGGER.error("[HW] Error in CHAT handler", e);
-            }
-        });
+        HolyWorldAutoReply.LOGGER.info("[ChatHandler] Ready");
     }
 
-    public void resetState() {
-        warned = false;
-        engine.clear();
+    public ResponseEngine getResponseEngine() {
+        return responseEngine;
     }
 
-    private void process(String raw) {
-        ModConfig cfg = HolyWorldAutoReply.getConfig();
-
+    /**
+     * Called from ChatHudMixin for every chat message
+     */
+    public void processIncoming(String raw) {
         if (raw == null || raw.isEmpty()) return;
 
-        String clean = stripColors(raw).trim();
-
-        if (!clean.contains("[CHECK]")) return;
-
-        HolyWorldAutoReply.LOGGER.info("[HW] Detected [CHECK] message: '{}'", clean);
-
-        if (cfg.isIdle()) {
-            HolyWorldAutoReply.LOGGER.info("[HW] State is IDLE, ignoring [CHECK]");
-            return;
-        }
-
-        Matcher m = P.matcher(clean);
-        if (!m.find()) {
-            HolyWorldAutoReply.LOGGER.warn("[HW] Pattern did NOT match! clean='{}'", clean);
-            return;
-        }
-
-        String nick = m.group(1);
-        String msg = m.group(2).trim();
-
-        HolyWorldAutoReply.LOGGER.info("[HW] Parsed: nick='{}', msg='{}'", nick, msg);
-
-        if (cfg.isWaiting()) {
-            cfg.activateCheck(nick);
-            HolyWorldAutoReply.LOGGER.info("[HW] State -> CHECK_ACTIVE for '{}'", nick);
-        }
-
-        if (cfg.isCheckActive() && nick.equalsIgnoreCase(cfg.getCheckedPlayerName())) {
-            handle(nick, msg);
-        }
-    }
-
-    private void handle(String n, String m) {
-        long now = System.currentTimeMillis();
-        Long last = cd.get(n);
-        if (last != null && now - last < 2000) return;
-        cd.put(n, now);
-
-        String l = m.toLowerCase();
         ModConfig cfg = HolyWorldAutoReply.getConfig();
 
-        HolyWorldAutoReply.LOGGER.info("[HW] Processing msg from '{}': '{}'", n, m);
+        // Must be enabled
+        if (!cfg.isEnabled()) return;
 
-        if (cfg.isAutoBan()) {
-            if (isInsult(l)) {
-                HolyWorldAutoReply.LOGGER.info("[HW] Insult -> banning {}", n);
-                ban(n, "30d Insult");
-                return;
-            }
-            String trimmed = l.trim();
-            if (trimmed.equals("\u043e\u0442\u043a\u0430\u0437") || trimmed.equals("\u043e\u0442\u043a\u0430\u0437\u044b\u0432\u0430\u044e\u0441\u044c")) {
-                HolyWorldAutoReply.LOGGER.info("[HW] Refusal -> banning {}", n);
-                ban(n, "30d Refusal");
-                return;
-            }
+        String clean = stripColors(raw);
+        if (!clean.contains("[CHECK]")) return;
+
+        HolyWorldAutoReply.LOGGER.info("[Handler] Processing: '{}'", clean);
+
+        // Parse [CHECK] Nick -> Message
+        int checkIdx = clean.indexOf("[CHECK]");
+        String afterCheck = clean.substring(checkIdx + 7).trim();
+
+        int arrowIdx = afterCheck.indexOf("->");
+        if (arrowIdx <= 0) {
+            HolyWorldAutoReply.LOGGER.warn("[Handler] No '->' found in: '{}'", afterCheck);
+            return;
         }
 
-        if (cfg.isAutoReply()) {
-            if (cfg.isAutoBan() && isRefuse(l) && !warned) {
-                warned = true;
-                chat("\u0415\u0441\u043b\u0438 \u0432\u044b \u043e\u0442\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442\u0435\u0441\u044c, \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435 \"\u043e\u0442\u043a\u0430\u0437\".", 1000);
-                return;
-            }
-            String r = engine.get(m);
-            if (r != null) {
-                HolyWorldAutoReply.LOGGER.info("[HW] Auto-reply: {}", r);
-                chat(r, 1200);
-            } else {
-                HolyWorldAutoReply.LOGGER.info("[HW] No auto-reply for: {}", m);
-            }
+        String playerName = afterCheck.substring(0, arrowIdx).trim();
+        String playerMessage = afterCheck.substring(arrowIdx + 2).trim();
+
+        playerName = playerName.replaceAll("[^a-zA-Z0-9_]", "");
+
+        if (playerName.isEmpty() || playerMessage.isEmpty()) {
+            HolyWorldAutoReply.LOGGER.warn("[Handler] Empty: name='{}' msg='{}'", playerName, playerMessage);
+            return;
+        }
+
+        // Don't reply to self
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null && client.player != null) {
+            String myName = client.player.getName().getString();
+            if (playerName.equalsIgnoreCase(myName)) return;
+        }
+
+        HolyWorldAutoReply.LOGGER.info("[Handler] Player='{}' Msg='{}'", playerName, playerMessage);
+
+        // === State management ===
+        // If IDLE, ignore
+        if (cfg.isIdle()) {
+            HolyWorldAutoReply.LOGGER.info("[Handler] State is IDLE, ignoring");
+            return;
+        }
+
+        // If WAITING, activate check with this player
+        if (cfg.isWaiting()) {
+            cfg.activateCheck(playerName);
+            HolyWorldAutoReply.LOGGER.info("[Handler] State -> CHECK_ACTIVE for '{}'", playerName);
+        }
+
+        // If CHECK_ACTIVE, only respond to the checked player
+        if (cfg.isCheckActive() && !playerName.equalsIgnoreCase(cfg.getCheckedPlayerName())) {
+            HolyWorldAutoReply.LOGGER.debug("[Handler] Ignoring '{}', checking '{}'", playerName, cfg.getCheckedPlayerName());
+            return;
+        }
+
+        // Cooldown
+        long now = System.currentTimeMillis();
+        Long last = cooldowns.get(playerName);
+        if (last != null && (now - last) < COOLDOWN_MS) return;
+        cooldowns.put(playerName, now);
+
+        // === Get engine result ===
+        ResponseEngine.EngineResult result = responseEngine.getResult(playerMessage, playerName);
+        if (result == null) return;
+
+        final String checkedNick = playerName;
+
+        switch (result.action) {
+            case REPLY:
+                if (cfg.isAutoReply() && result.message != null && !result.message.isEmpty()) {
+                    HolyWorldAutoReply.LOGGER.info("[Handler] Reply: '{}'", result.message);
+                    long delay = 800 + (long)(Math.random() * 1200);
+                    scheduler.schedule(() -> sendChat(result.message), delay, TimeUnit.MILLISECONDS);
+                }
+                break;
+
+            case BAN_INSULT:
+                if (cfg.isAutoBanInsult()) {
+                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN INSULT: {}", checkedNick);
+                    scheduler.schedule(() -> {
+                        sendCommand("hm sban " + checkedNick + " 30d Insult");
+                        HolyWorldAutoReply.getConfig().endCheck();
+                        responseEngine.clearPlayerState(checkedNick);
+                        autoEndCheckout(checkedNick);
+                    }, 500, TimeUnit.MILLISECONDS);
+                } else {
+                    // If ban disabled, just reply
+                    String msg = "Оскорбления не помогут. Скачивай AnyDesk";
+                    long delay = 800 + (long)(Math.random() * 1200);
+                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                }
+                break;
+
+            case BAN_REFUSAL:
+                if (cfg.isAutoBanRefusal()) {
+                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN REFUSAL: {}", checkedNick);
+                    scheduler.schedule(() -> {
+                        sendCommand("hm sban " + checkedNick + " 30d Refusal");
+                        HolyWorldAutoReply.getConfig().endCheck();
+                        responseEngine.clearPlayerState(checkedNick);
+                        autoEndCheckout(checkedNick);
+                    }, 500, TimeUnit.MILLISECONDS);
+                } else {
+                    String msg = "Отказ от проверки - 30 дней бана. Уверен?";
+                    long delay = 800 + (long)(Math.random() * 1200);
+                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                }
+                break;
+
+            case BAN_CONFESSION:
+                if (cfg.isAutoBanConfession()) {
+                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN CONFESSION: {}", checkedNick);
+                    scheduler.schedule(() -> {
+                        sendCommand("hm sban " + checkedNick + " 20d Confession");
+                        HolyWorldAutoReply.getConfig().endCheck();
+                        responseEngine.clearPlayerState(checkedNick);
+                        autoEndCheckout(checkedNick);
+                    }, 500, TimeUnit.MILLISECONDS);
+                } else {
+                    String msg = "Признание принято. Спасибо за честность";
+                    long delay = 800 + (long)(Math.random() * 1200);
+                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                }
+                break;
         }
     }
 
-    private void chat(String m, int d) {
-        ex.schedule(() -> {
-            MinecraftClient c = MinecraftClient.getInstance();
-            if (c != null && c.player != null && c.getNetworkHandler() != null) {
-                c.execute(() -> {
-                    c.getNetworkHandler().sendChatMessage(m);
-                    HolyWorldAutoReply.LOGGER.info("[HW] Sent: {}", m);
-                });
+    private void autoEndCheckout(String nick) {
+        ModConfig cfg = HolyWorldAutoReply.getConfig();
+        if (cfg.isAutoOut()) {
+            scheduler.schedule(() -> {
+                sendCommand("hm endcheckout ban " + nick + " false");
+                HolyWorldAutoReply.LOGGER.info("[Handler] AutoOut: endcheckout for {}", nick);
+            }, 1500, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void sendChat(String message) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return;
+        client.execute(() -> {
+            try {
+                if (client.player == null || client.getNetworkHandler() == null) return;
+                client.getNetworkHandler().sendChatMessage(message);
+                HolyWorldAutoReply.LOGGER.info("[Handler] SENT: '{}'", message);
+            } catch (Exception e) {
+                HolyWorldAutoReply.LOGGER.error("[Handler] Send failed: {}", e.getMessage());
             }
-        }, d, TimeUnit.MILLISECONDS);
+        });
     }
 
-    private void ban(String n, String r) {
-        ex.schedule(() -> {
-            MinecraftClient c = MinecraftClient.getInstance();
-            if (c != null && c.player != null && c.getNetworkHandler() != null) {
-                c.execute(() -> {
-                    c.getNetworkHandler().sendChatCommand("hm sban " + n + " " + r);
-                    HolyWorldAutoReply.LOGGER.info("[HW] Executed ban: {} {}", n, r);
-                    HolyWorldAutoReply.getConfig().endCheck();
-                    resetState();
-                });
+    private void sendCommand(String command) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return;
+        client.execute(() -> {
+            try {
+                if (client.player == null || client.getNetworkHandler() == null) return;
+                String cmd = command.startsWith("/") ? command.substring(1) : command;
+                client.getNetworkHandler().sendChatCommand(cmd);
+                HolyWorldAutoReply.LOGGER.info("[Handler] CMD: /{}", cmd);
+            } catch (Exception e) {
+                HolyWorldAutoReply.LOGGER.error("[Handler] Command failed: {}", e.getMessage());
             }
-        }, 500, TimeUnit.MILLISECONDS);
+        });
     }
 
-    private boolean isInsult(String s) {
-        return s.contains("\u043d\u0430\u0445\u0443\u0439") || s.contains("\u043f\u0438\u0434\u043e\u0440") ||
-               s.contains("\u0445\u0443\u0439") || s.contains("\u0435\u0431\u0430\u043b") ||
-               s.contains("\u0441\u0443\u043a\u0430") || s.contains("\u0431\u043b\u044f");
-    }
-
-    private boolean isRefuse(String s) {
-        return s.contains("\u043d\u0435 \u0431\u0443\u0434\u0443") || s.contains("\u043d\u0435 \u0445\u043e\u0447\u0443") || s.contains("\u043d\u0435 \u0441\u0442\u0430\u043d\u0443");
-    }
-
-    private String stripColors(String s) {
-        if (s == null) return "";
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\u00A7' && i + 1 < s.length()) {
+    private static String stripColors(String input) {
+        if (input == null) return "";
+        StringBuilder sb = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '\u00A7' && i + 1 < input.length()) {
                 i++;
-            } else {
-                b.append(c);
+                continue;
             }
+            sb.append(c);
         }
-        return b.toString();
+        return sb.toString();
     }
 }

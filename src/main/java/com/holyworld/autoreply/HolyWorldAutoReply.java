@@ -1,10 +1,9 @@
 package com.holyworld.autoreply;
 
+import com.holyworld.autoreply.command.AICommand;
 import com.holyworld.autoreply.config.ModConfig;
 import com.holyworld.autoreply.handler.ChatHandler;
-import com.holyworld.autoreply.handler.CommandInterceptor;
 import com.holyworld.autoreply.gui.MenuScreen;
-import com.holyworld.autoreply.command.AICommand;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -20,21 +19,24 @@ public class HolyWorldAutoReply implements ClientModInitializer {
 
     private static ModConfig config;
     private static ChatHandler chatHandler;
-    private static CommandInterceptor commandInterceptor;
     private static KeyBinding menuKey;
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[HW] v7.0 Initializing...");
+        LOGGER.info("===========================================");
+        LOGGER.info("[HW] v2.0.0 Fabric 1.20.1");
+        LOGGER.info("[HW] Chat mode: PUBLIC CHAT + Mixin");
+        LOGGER.info("===========================================");
 
         config = new ModConfig();
         chatHandler = new ChatHandler();
-        commandInterceptor = new CommandInterceptor();
-
         AICommand.register();
 
         menuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "HolyWorld Menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "HW AutoReply"
+            "HolyWorld Menu",
+            InputUtil.Type.KEYSYM,
+            GLFW.GLFW_KEY_RIGHT_SHIFT,
+            "HW AutoReply"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -45,10 +47,10 @@ public class HolyWorldAutoReply implements ClientModInitializer {
             }
         });
 
-        LOGGER.info("[HW] v7.0 Initialized successfully!");
-        LOGGER.info("[HW] AutoReply={}, AutoBan={}", config.isAutoReply(), config.isAutoBan());
+        LOGGER.info("[HW] Ready! RIGHT SHIFT = Menu, /ai = commands");
     }
 
     public static ModConfig getConfig() { return config; }
     public static ChatHandler getChatHandler() { return chatHandler; }
+    public static Logger logger() { return LOGGER; }
 }
