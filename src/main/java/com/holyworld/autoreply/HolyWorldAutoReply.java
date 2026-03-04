@@ -23,7 +23,7 @@ public class HolyWorldAutoReply implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[HW] v2.2.0 Запуск...");
+        LOGGER.info("[HW] v2.3.0 Запуск...");
         config = new ModConfig();
         chatHandler = new ChatHandler();
         AICommand.register();
@@ -38,7 +38,7 @@ public class HolyWorldAutoReply implements ClientModInitializer {
             }
         });
 
-        LOGGER.info("[HW] Готов! RSHIFT = Меню, /ai = команды");
+        LOGGER.info("[HW] Готов! RSHIFT=Меню, /ai=команды");
     }
 
     public static ModConfig getConfig() { return config; }

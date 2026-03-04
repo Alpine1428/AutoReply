@@ -34,16 +34,10 @@ public class ModConfig {
     public void toggleAutoBanConfession() { autoBanConfession = !autoBanConfession; }
 
     public boolean isAutoReports() { return autoReports; }
-    public void toggleAutoReports() {
-        autoReports = !autoReports;
-        if (autoReports) autoCheckout = false;
-    }
+    public void toggleAutoReports() { autoReports = !autoReports; if (autoReports) autoCheckout = false; }
 
     public boolean isAutoCheckout() { return autoCheckout; }
-    public void toggleAutoCheckout() {
-        autoCheckout = !autoCheckout;
-        if (autoCheckout) autoReports = false;
-    }
+    public void toggleAutoCheckout() { autoCheckout = !autoCheckout; if (autoCheckout) autoReports = false; }
 
     public boolean isAutoOut() { return autoOut; }
     public void toggleAutoOut() { autoOut = !autoOut; }

@@ -9,11 +9,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChatScreen.class)
 public class ChatScreenMixin {
-
     @Inject(method = "sendMessage", at = @At("HEAD"))
     private void onSendMessage(String message, boolean addToHistory, CallbackInfoReturnable<Boolean> cir) {
-        if (message != null && message.startsWith("/")) {
-            CommandInterceptor.onPlayerSendCommand(message);
-        }
+        if (message != null && message.startsWith("/")) CommandInterceptor.onPlayerSendCommand(message);
     }
 }

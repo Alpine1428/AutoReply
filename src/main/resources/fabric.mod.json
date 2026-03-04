@@ -3,7 +3,7 @@
   "id": "holyworld-autoreply",
   "version": "${version}",
   "name": "HolyWorld AutoReply",
-  "description": "Помощник модератора HolyWorld v2.2",
+  "description": "Помощник модератора HolyWorld v2.3",
   "authors": ["HolyWorld"],
   "license": "MIT",
   "environment": "client",
