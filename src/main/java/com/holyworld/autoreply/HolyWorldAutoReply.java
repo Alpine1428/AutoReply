@@ -16,29 +16,23 @@ import org.slf4j.LoggerFactory;
 public class HolyWorldAutoReply implements ClientModInitializer {
     public static final String MOD_ID = "holyworld-autoreply";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
     private static ModConfig config;
     private static ChatHandler chatHandler;
     private static KeyBinding menuKey;
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[HW] v2.3.0 Запуск...");
+        LOGGER.info("[HW] v2.4.0 Запуск...");
         config = new ModConfig();
         chatHandler = new ChatHandler();
         AICommand.register();
-
         menuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "Меню HolyWorld", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "HW AutoReply"
         ));
-
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (menuKey.wasPressed()) {
-                if (client.currentScreen == null) client.setScreen(new MenuScreen());
-            }
+            while (menuKey.wasPressed()) { if (client.currentScreen == null) client.setScreen(new MenuScreen()); }
         });
-
-        LOGGER.info("[HW] Готов! RSHIFT=Меню, /ai=команды");
+        LOGGER.info("[HW] Готов!");
     }
 
     public static ModConfig getConfig() { return config; }
