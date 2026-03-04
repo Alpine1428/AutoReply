@@ -23,34 +23,24 @@ public class HolyWorldAutoReply implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("===========================================");
-        LOGGER.info("[HW] v2.0.0 Fabric 1.20.1");
-        LOGGER.info("[HW] Chat mode: PUBLIC CHAT + Mixin");
-        LOGGER.info("===========================================");
-
+        LOGGER.info("[HW] v2.2.0 Запуск...");
         config = new ModConfig();
         chatHandler = new ChatHandler();
         AICommand.register();
 
         menuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "HolyWorld Menu",
-            InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_RIGHT_SHIFT,
-            "HW AutoReply"
+            "Меню HolyWorld", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "HW AutoReply"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (menuKey.wasPressed()) {
-                if (client.currentScreen == null) {
-                    client.setScreen(new MenuScreen());
-                }
+                if (client.currentScreen == null) client.setScreen(new MenuScreen());
             }
         });
 
-        LOGGER.info("[HW] Ready! RIGHT SHIFT = Menu, /ai = commands");
+        LOGGER.info("[HW] Готов! RSHIFT = Меню, /ai = команды");
     }
 
     public static ModConfig getConfig() { return config; }
     public static ChatHandler getChatHandler() { return chatHandler; }
-    public static Logger logger() { return LOGGER; }
 }

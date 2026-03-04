@@ -25,14 +25,14 @@ public class ChatHudMixin {
             String plain = message.getString();
             if (plain == null || plain.isEmpty()) return;
 
-            if (plain.contains("[CHECK]")) {
-                HolyWorldAutoReply.LOGGER.info("[Mixin] Caught: {}", plain);
+            if (plain.contains("[CHECK]") || plain.contains("[CHECK]")) {
+                HolyWorldAutoReply.LOGGER.info("[Mixin] Поймано: {}", plain);
                 if (HolyWorldAutoReply.getChatHandler() != null) {
                     HolyWorldAutoReply.getChatHandler().processIncoming(plain);
                 }
             }
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[Mixin] Error: {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[Mixin] Ошибка: {}", e.getMessage());
         }
     }
 }

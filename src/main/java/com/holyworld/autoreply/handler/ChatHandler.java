@@ -9,210 +9,182 @@ import java.util.concurrent.*;
 
 public class ChatHandler {
 
-    private final ResponseEngine responseEngine;
+    private final ResponseEngine engine;
     private final ScheduledExecutorService scheduler;
     private final ConcurrentHashMap<String, Long> cooldowns = new ConcurrentHashMap<>();
-    private static final long COOLDOWN_MS = 2500;
 
     public ChatHandler() {
-        this.responseEngine = new ResponseEngine();
+        this.engine = new ResponseEngine();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "HW-AutoReply");
+            Thread t = new Thread(r, "HW-Chat");
             t.setDaemon(true);
             return t;
         });
-        HolyWorldAutoReply.LOGGER.info("[ChatHandler] Ready");
     }
 
-    public ResponseEngine getResponseEngine() {
-        return responseEngine;
-    }
+    public ResponseEngine getResponseEngine() { return engine; }
 
     /**
-     * Called from ChatHudMixin for every chat message
+     * Вызывается из ChatHudMixin при каждом сообщении в чат
      */
     public void processIncoming(String raw) {
         if (raw == null || raw.isEmpty()) return;
 
         ModConfig cfg = HolyWorldAutoReply.getConfig();
-
-        // Must be enabled
         if (!cfg.isEnabled()) return;
 
         String clean = stripColors(raw);
         if (!clean.contains("[CHECK]")) return;
 
-        HolyWorldAutoReply.LOGGER.info("[Handler] Processing: '{}'", clean);
+        HolyWorldAutoReply.LOGGER.info("[Handler] Получено: '{}'", clean);
 
-        // Parse [CHECK] Nick -> Message
-        int checkIdx = clean.indexOf("[CHECK]");
-        String afterCheck = clean.substring(checkIdx + 7).trim();
+        // Парсинг [CHECK] Ник -> Сообщение
+        int idx = clean.indexOf("[CHECK]");
+        String after = clean.substring(idx + 7).trim();
 
-        int arrowIdx = afterCheck.indexOf("->");
-        if (arrowIdx <= 0) {
-            HolyWorldAutoReply.LOGGER.warn("[Handler] No '->' found in: '{}'", afterCheck);
+        // Ищем разделитель: -> или : или »
+        int arrow = after.indexOf("->");
+        if (arrow == -1) arrow = after.indexOf(":");
+        if (arrow == -1) arrow = after.indexOf("»");
+        if (arrow <= 0) {
+            HolyWorldAutoReply.LOGGER.warn("[Handler] Разделитель не найден в: '{}'", after);
             return;
         }
 
-        String playerName = afterCheck.substring(0, arrowIdx).trim();
-        String playerMessage = afterCheck.substring(arrowIdx + 2).trim();
+        String nick = after.substring(0, arrow).trim().replaceAll("[^a-zA-Z0-9_]", "");
+        String msg = after.substring(arrow + (after.charAt(arrow) == '-' ? 2 : 1)).trim();
+        if (msg.startsWith(">")) msg = msg.substring(1).trim();
 
-        playerName = playerName.replaceAll("[^a-zA-Z0-9_]", "");
+        if (nick.isEmpty() || msg.isEmpty()) return;
 
-        if (playerName.isEmpty() || playerMessage.isEmpty()) {
-            HolyWorldAutoReply.LOGGER.warn("[Handler] Empty: name='{}' msg='{}'", playerName, playerMessage);
-            return;
-        }
-
-        // Don't reply to self
+        // Не отвечаем себе
         MinecraftClient client = MinecraftClient.getInstance();
         if (client != null && client.player != null) {
-            String myName = client.player.getName().getString();
-            if (playerName.equalsIgnoreCase(myName)) return;
+            if (nick.equalsIgnoreCase(client.player.getName().getString())) return;
         }
 
-        HolyWorldAutoReply.LOGGER.info("[Handler] Player='{}' Msg='{}'", playerName, playerMessage);
+        HolyWorldAutoReply.LOGGER.info("[Handler] Ник='{}' Сообщение='{}'", nick, msg);
 
-        // === State management ===
-        // If IDLE, ignore
+        // === ЛОГИКА СОСТОЯНИЙ ===
+
+        // IDLE - игнорируем
         if (cfg.isIdle()) {
-            HolyWorldAutoReply.LOGGER.info("[Handler] State is IDLE, ignoring");
+            HolyWorldAutoReply.LOGGER.info("[Handler] Состояние IDLE, пропускаем");
             return;
         }
 
-        // If WAITING, activate check with this player
+        // WAITING -> ACTIVE (первое сообщение активирует проверку)
         if (cfg.isWaiting()) {
-            cfg.activateCheck(playerName);
-            HolyWorldAutoReply.LOGGER.info("[Handler] State -> CHECK_ACTIVE for '{}'", playerName);
+            cfg.activateCheck(nick);
+            HolyWorldAutoReply.LOGGER.info("[Handler] Проверка активирована: {}", nick);
         }
 
-        // If CHECK_ACTIVE, only respond to the checked player
-        if (cfg.isCheckActive() && !playerName.equalsIgnoreCase(cfg.getCheckedPlayerName())) {
-            HolyWorldAutoReply.LOGGER.debug("[Handler] Ignoring '{}', checking '{}'", playerName, cfg.getCheckedPlayerName());
+        // ACTIVE - отвечаем только проверяемому игроку
+        if (cfg.isCheckActive() && !nick.equalsIgnoreCase(cfg.getCheckedPlayerName())) {
             return;
         }
 
-        // Cooldown
+        // Анти-спам (2 сек между ответами)
         long now = System.currentTimeMillis();
-        Long last = cooldowns.get(playerName);
-        if (last != null && (now - last) < COOLDOWN_MS) return;
-        cooldowns.put(playerName, now);
+        Long last = cooldowns.get(nick);
+        if (last != null && (now - last) < 2000) return;
+        cooldowns.put(nick, now);
 
-        // === Get engine result ===
-        ResponseEngine.EngineResult result = responseEngine.getResult(playerMessage, playerName);
+        // === ПОЛУЧАЕМ ОТВЕТ ОТ AI ===
+        ResponseEngine.Result result = engine.getResult(msg, nick);
         if (result == null) return;
-
-        final String checkedNick = playerName;
 
         switch (result.action) {
             case REPLY:
-                if (cfg.isAutoReply() && result.message != null && !result.message.isEmpty()) {
-                    HolyWorldAutoReply.LOGGER.info("[Handler] Reply: '{}'", result.message);
+                if (cfg.isAutoReply() && result.message != null) {
                     long delay = 800 + (long)(Math.random() * 1200);
-                    scheduler.schedule(() -> sendChat(result.message), delay, TimeUnit.MILLISECONDS);
+                    scheduleChat(result.message, delay);
                 }
                 break;
 
             case BAN_INSULT:
                 if (cfg.isAutoBanInsult()) {
-                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN INSULT: {}", checkedNick);
-                    scheduler.schedule(() -> {
-                        sendCommand("hm sban " + checkedNick + " 30d Insult");
-                        HolyWorldAutoReply.getConfig().endCheck();
-                        responseEngine.clearPlayerState(checkedNick);
-                        autoEndCheckout(checkedNick);
-                    }, 500, TimeUnit.MILLISECONDS);
+                    // /hm sban 30d Неадекват (БЕЗ НИКА)
+                    performBan("30d", "Неадекват", nick);
                 } else {
-                    // If ban disabled, just reply
-                    String msg = "Оскорбления не помогут. Скачивай AnyDesk";
-                    long delay = 800 + (long)(Math.random() * 1200);
-                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                    scheduleChat("Оскорбления не помогут. Качай AnyDesk.", 1000);
                 }
                 break;
 
             case BAN_REFUSAL:
                 if (cfg.isAutoBanRefusal()) {
-                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN REFUSAL: {}", checkedNick);
-                    scheduler.schedule(() -> {
-                        sendCommand("hm sban " + checkedNick + " 30d Refusal");
-                        HolyWorldAutoReply.getConfig().endCheck();
-                        responseEngine.clearPlayerState(checkedNick);
-                        autoEndCheckout(checkedNick);
-                    }, 500, TimeUnit.MILLISECONDS);
+                    // /hm sban 30d Отказ (БЕЗ НИКА)
+                    performBan("30d", "Отказ", nick);
                 } else {
-                    String msg = "Отказ от проверки - 30 дней бана. Уверен?";
-                    long delay = 800 + (long)(Math.random() * 1200);
-                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                    scheduleChat("Отказ = бан 30 дней. Уверен?", 1000);
                 }
                 break;
 
             case BAN_CONFESSION:
                 if (cfg.isAutoBanConfession()) {
-                    HolyWorldAutoReply.LOGGER.info("[Handler] BAN CONFESSION: {}", checkedNick);
-                    scheduler.schedule(() -> {
-                        sendCommand("hm sban " + checkedNick + " 20d Confession");
-                        HolyWorldAutoReply.getConfig().endCheck();
-                        responseEngine.clearPlayerState(checkedNick);
-                        autoEndCheckout(checkedNick);
-                    }, 500, TimeUnit.MILLISECONDS);
+                    // /hm sban 20d Признание (БЕЗ НИКА)
+                    performBan("20d", "Признание", nick);
                 } else {
-                    String msg = "Признание принято. Спасибо за честность";
-                    long delay = 800 + (long)(Math.random() * 1200);
-                    scheduler.schedule(() -> sendChat(msg), delay, TimeUnit.MILLISECONDS);
+                    scheduleChat("Признание принято.", 1000);
                 }
                 break;
         }
     }
 
-    private void autoEndCheckout(String nick) {
-        ModConfig cfg = HolyWorldAutoReply.getConfig();
-        if (cfg.isAutoOut()) {
-            scheduler.schedule(() -> {
-                sendCommand("hm endcheckout ban " + nick + " false");
-                HolyWorldAutoReply.LOGGER.info("[Handler] AutoOut: endcheckout for {}", nick);
-            }, 1500, TimeUnit.MILLISECONDS);
+    /**
+     * Бан БЕЗ НИКА - другой плагин сам подставляет игрока на проверке
+     * Формат: /hm sban <время> <причина>
+     */
+    private void performBan(String time, String reason, String nick) {
+        HolyWorldAutoReply.LOGGER.info("[Handler] БАН: {} {} (игрок: {})", time, reason, nick);
+
+        // Команда бана БЕЗ ника
+        scheduleCommand("hm sban " + time + " " + reason, 500);
+
+        // Завершаем проверку
+        scheduler.schedule(() -> {
+            HolyWorldAutoReply.getConfig().endCheck();
+            engine.clearPlayerState(nick);
+            HolyWorldAutoReply.LOGGER.info("[Handler] Проверка завершена");
+        }, 600, TimeUnit.MILLISECONDS);
+
+        // Auto Out
+        if (HolyWorldAutoReply.getConfig().isAutoOut()) {
+            scheduleCommand("hm endcheckout ban " + nick + " false", 2500);
         }
     }
 
-    private void sendChat(String message) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null) return;
-        client.execute(() -> {
-            try {
-                if (client.player == null || client.getNetworkHandler() == null) return;
-                client.getNetworkHandler().sendChatMessage(message);
-                HolyWorldAutoReply.LOGGER.info("[Handler] SENT: '{}'", message);
-            } catch (Exception e) {
-                HolyWorldAutoReply.LOGGER.error("[Handler] Send failed: {}", e.getMessage());
+    private void scheduleChat(String msg, long delay) {
+        scheduler.schedule(() -> {
+            MinecraftClient c = MinecraftClient.getInstance();
+            if (c != null && c.player != null && c.getNetworkHandler() != null) {
+                c.execute(() -> {
+                    c.getNetworkHandler().sendChatMessage(msg);
+                    HolyWorldAutoReply.LOGGER.info("[Handler] Отправлено: '{}'", msg);
+                });
             }
-        });
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
-    private void sendCommand(String command) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null) return;
-        client.execute(() -> {
-            try {
-                if (client.player == null || client.getNetworkHandler() == null) return;
-                String cmd = command.startsWith("/") ? command.substring(1) : command;
-                client.getNetworkHandler().sendChatCommand(cmd);
-                HolyWorldAutoReply.LOGGER.info("[Handler] CMD: /{}", cmd);
-            } catch (Exception e) {
-                HolyWorldAutoReply.LOGGER.error("[Handler] Command failed: {}", e.getMessage());
+    private void scheduleCommand(String cmd, long delay) {
+        scheduler.schedule(() -> {
+            MinecraftClient c = MinecraftClient.getInstance();
+            if (c != null && c.player != null && c.getNetworkHandler() != null) {
+                c.execute(() -> {
+                    c.getNetworkHandler().sendChatCommand(cmd);
+                    HolyWorldAutoReply.LOGGER.info("[Handler] Команда: /{}", cmd);
+                });
             }
-        });
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
-    private static String stripColors(String input) {
-        if (input == null) return "";
-        StringBuilder sb = new StringBuilder(input.length());
-        for (int i = 0; i < input.length(); i++) {
-            char c = input.charAt(i);
-            if (c == '\u00A7' && i + 1 < input.length()) {
-                i++;
-                continue;
-            }
-            sb.append(c);
+    private static String stripColors(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\u00A7' && i + 1 < s.length()) { i++; }
+            else sb.append(c);
         }
         return sb.toString();
     }

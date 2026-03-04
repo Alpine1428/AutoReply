@@ -3,18 +3,14 @@
   "id": "holyworld-autoreply",
   "version": "${version}",
   "name": "HolyWorld AutoReply",
-  "description": "Auto reply for HolyWorld moderators v2.0",
+  "description": "Помощник модератора HolyWorld v2.2",
   "authors": ["HolyWorld"],
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
-    "client": [
-      "com.holyworld.autoreply.HolyWorldAutoReply"
-    ]
+    "client": ["com.holyworld.autoreply.HolyWorldAutoReply"]
   },
-  "mixins": [
-    "holyworld-autoreply.mixins.json"
-  ],
+  "mixins": ["holyworld-autoreply.mixins.json"],
   "depends": {
     "fabricloader": ">=0.15.0",
     "minecraft": "~1.20.1",
