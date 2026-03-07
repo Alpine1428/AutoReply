@@ -14,24 +14,12 @@ public class ClientPlayNetworkHandlerMixin {
     @Inject(method = "sendChatCommand", at = @At("HEAD"))
     private void onSendChatCommand(String command, CallbackInfo ci) {
         try {
-            if (command != null) {
-                HolyWorldAutoReply.LOGGER.info("[Mixin-CMD] Перехвачена команда: /{}", command);
-                CommandInterceptor.onPlayerSendCommand(command);
-            }
+            if (command == null || command.isEmpty()) return;
+            if (CommandInterceptor.isSelfSending()) return;
+            HolyWorldAutoReply.LOGGER.info("[Mixin-NET] /{}", command);
+            CommandInterceptor.onCommandDetected(command);
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[Mixin-CMD] Ошибка: {}", e.getMessage());
-        }
-    }
-
-    @Inject(method = "sendChatMessage", at = @At("HEAD"))
-    private void onSendChatMessage(String message, CallbackInfo ci) {
-        try {
-            if (message != null && message.startsWith("/")) {
-                HolyWorldAutoReply.LOGGER.info("[Mixin-MSG] Перехвачено сообщение-команда: {}", message);
-                CommandInterceptor.onPlayerSendCommand(message);
-            }
-        } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[Mixin-MSG] Ошибка: {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[Mixin-NET] {}", e.getMessage());
         }
     }
 }
