@@ -44,13 +44,14 @@ public class ChatHandler {
         if (nick.isEmpty() || msg.isEmpty()) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client != null && client.player != null && nick.equalsIgnoreCase(client.player.getName().getString())) return;
+        if (client != null && client.player != null &&
+            nick.equalsIgnoreCase(client.player.getName().getString())) return;
 
         if (cfg.isIdle()) return;
 
         if (cfg.isWaiting()) {
             cfg.activateCheck(nick);
-            HolyWorldAutoReply.LOGGER.info("[Handler] Проверка активирована: {}", nick);
+            HolyWorldAutoReply.LOGGER.info("[Chat] Проверка: {}", nick);
         }
 
         if (cfg.isCheckActive() && !nick.equalsIgnoreCase(cfg.getCheckedPlayerName())) return;
@@ -95,16 +96,15 @@ public class ChatHandler {
     }
 
     private void performBan(String time, String reason, String nick) {
-        HolyWorldAutoReply.LOGGER.info("[Handler] БАН: {} {} ({})", time, reason, nick);
-        // Используем scheduleSelfCommand чтобы mixin не перехватывал наши же команды
-        CommandInterceptor.scheduleSelfCommand("hm sban " + time + " " + reason, 500);
+        HolyWorldAutoReply.LOGGER.info("[Chat] БАН: {} {} ({})", time, reason, nick);
+        CommandInterceptor.sendOwnCommand("hm sban " + time + " " + reason, 500);
         scheduler.schedule(() -> {
             HolyWorldAutoReply.getConfig().endCheck();
             engine.clearPlayerState(nick);
             if (HolyWorldAutoReply.getConfig().isAutoOut()) {
-                CommandInterceptor.scheduleSelfCommand("hm endcheckout ban " + nick + " false", 1500);
+                CommandInterceptor.sendOwnCommand("hm endcheckout ban " + nick + " false", 1500);
             }
-        }, 700, TimeUnit.MILLISECONDS);
+        }, 1200, TimeUnit.MILLISECONDS);
     }
 
     private void scheduleChat(String msg, long delay) {

@@ -5,7 +5,7 @@
   "client": [
     "ChatHudMixin",
     "ChatScreenMixin",
-    "ClientPlayNetworkHandlerMixin"
+    "CommandSendMixin"
   ],
   "injectors": {
     "defaultRequire": 1

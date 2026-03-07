@@ -30,7 +30,9 @@ public class HolyWorldAutoReply implements ClientModInitializer {
             "Меню HolyWorld", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, "HW AutoReply"
         ));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (menuKey.wasPressed()) { if (client.currentScreen == null) client.setScreen(new MenuScreen()); }
+            while (menuKey.wasPressed()) {
+                if (client.currentScreen == null) client.setScreen(new MenuScreen());
+            }
         });
         LOGGER.info("[HW] Готов!");
     }

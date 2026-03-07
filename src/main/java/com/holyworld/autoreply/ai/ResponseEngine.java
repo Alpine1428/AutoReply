@@ -13,7 +13,7 @@ public class ResponseEngine {
     public ResponseEngine() {
         buildRules();
         rules.sort((a, b) -> Integer.compare(b.priority, a.priority));
-        HolyWorldAutoReply.LOGGER.info("[Engine] Загружено {} правил", rules.size());
+        HolyWorldAutoReply.LOGGER.info("[Engine] {} правил", rules.size());
     }
 
     public static class PlayerState {
@@ -60,30 +60,22 @@ public class ResponseEngine {
 
     private void buildRules() {
 
-        // ==================== 500: ПРЯМОЙ ОТКАЗ ====================
-
         rules.add(new Rule("ban_refusal_exact", 500,
             (m,l,s) -> eq(l, "отказ", "отказываюсь"),
             (m,l,s) -> Result.banRefusal()));
-
-        // ==================== 495: ПРЯМОЕ ПРИЗНАНИЕ ====================
 
         rules.add(new Rule("ban_confession_exact", 495,
             (m,l,s) -> eq(l, "я чит", "я читер", "признание"),
             (m,l,s) -> Result.banConfession()));
 
-        // ==================== 490: ПРИЗНАНИЕ С ДОПСЛОВАМИ ====================
-
         rules.add(new Rule("ban_confession_extended", 490,
             (m,l,s) -> {
-                String trimmed = l.trim();
-                if (trimmed.startsWith("я чит") && trimmed.length() > 5) return true;
-                if (trimmed.startsWith("я читер") && trimmed.length() > 7) return true;
+                String t = l.trim();
+                if (t.startsWith("я чит") && t.length() > 5) return true;
+                if (t.startsWith("я читер") && t.length() > 7) return true;
                 return false;
             },
             (m,l,s) -> Result.banConfession()));
-
-        // ==================== 400: ОСКОРБЛЕНИЕ МОДЕРАТОРА ====================
 
         rules.add(new Rule("insult_moderator", 400,
             (m,l,s) -> {
@@ -101,7 +93,7 @@ public class ResponseEngine {
                     "уебок","уёбок","уебан","залупа",
                     "мудак","мудила","козёл","козел","говнюк");
                 if (!hasInsult) return false;
-                boolean directedAtPerson = has(l,
+                return has(l,
                     "ты сука","ты мразь","ты урод","ты дебил",
                     "ты даун","ты чмо","ты пидор","ты конч",
                     "ты идиот","ты кретин","ты тварь","ты шлюха",
@@ -118,11 +110,8 @@ public class ResponseEngine {
                     "админ сука","админ мразь","админ урод","админ дебил",
                     "тебя ебал","тебе пизд","тебя нах",
                     "маму ебал","твою мать");
-                return directedAtPerson;
             },
             (m,l,s) -> Result.banInsult()));
-
-        // ==================== 355: КОНТЕКСТНЫЙ ОТКАЗ ====================
 
         rules.add(new Rule("contextual_refusal", 355,
             (m,l,s) -> {
@@ -144,10 +133,8 @@ public class ResponseEngine {
                     s.warnedRefusal = true;
                     return Result.reply("Если отказываешься от проверки - напиши \"Отказ\". Это бан на 30 дней.");
                 }
-                return Result.reply("Последний шанс. Напиши \"Отказ\" для оформления отказа от проверки. Бан 30 дней.");
+                return Result.reply("Последний шанс. Напиши \"Отказ\" для оформления. Бан 30 дней.");
             }));
-
-        // ==================== 305: КОНТЕКСТНОЕ ПРИЗНАНИЕ ====================
 
         rules.add(new Rule("contextual_confession", 305,
             (m,l,s) -> has(l,
@@ -194,18 +181,14 @@ public class ResponseEngine {
                 return Result.reply("Напиши \"Я чит\" для оформления признания. Бан 20 дней.");
             }));
 
-        // ==================== 250: УГРОЗЫ ====================
-
         rules.add(new Rule("threats", 250,
             (m,l,s) -> has(l, "найду тебя","тебе конец","ты труп","убью","зарежу",
                 "взломаю","ддос","ddos","деаноним","сват","свачу","узнаю где жив"),
             (m,l,s) -> Result.reply(pick(
                 "Угрозы только ухудшают твоё положение. Качай " + s.prog() + " и проходи проверку.",
-                "Мне не страшно, а вот тебе стоит поторопиться. Жду " + s.prog() + ".",
+                "Мне не страшно. Жду " + s.prog() + ".",
                 "Угрозы не отменяют проверку. Осталось " + s.remaining() + " мин."
             ))));
-
-        // ==================== 200: УХОД ====================
 
         rules.add(new Rule("leaving", 200,
             (m,l,s) -> eq(l.trim(), "бб","bb","бай","пока","выхожу") ||
@@ -213,14 +196,10 @@ public class ResponseEngine {
                     "бб всем","бб короче","пока всем","качать не охота",
                     "качать не буду","я жду бан","лад баньте","ладно баньте"),
             (m,l,s) -> {
-                if (!s.warnedRefusal) {
-                    s.warnedRefusal = true;
-                    return Result.reply("Выход = отказ от проверки (30 дней бана). Напиши \"Отказ\" если уверен.");
-                }
+                if (!s.warnedRefusal) { s.warnedRefusal = true;
+                    return Result.reply("Выход = отказ от проверки (30 дней бана). Напиши \"Отказ\" если уверен."); }
                 return Result.reply("Уход = отказ. Напиши \"Отказ\" для оформления.");
             }));
-
-        // ==================== 150: КОД ====================
 
         rules.add(new Rule("code", 150,
             (m,l,s) -> m.replaceAll("[^0-9]", "").length() >= 9,
@@ -228,11 +207,9 @@ public class ResponseEngine {
                 return Result.reply(pick(
                     "Код принят. Подключаюсь. Прими запрос в " + s.prog() + ".",
                     "Принимай запрос подключения. Не трогай мышку и клавиатуру.",
-                    "Вижу код. Подключаюсь, нажми зелёную кнопку 'Принять'.",
+                    "Вижу код. Подключаюсь, нажми 'Принять'.",
                     "Сейчас зайду. Жми 'Принять' когда появится запрос."
                 )); }));
-
-        // ==================== 145: СКИНУЛ В ЛС ====================
 
         rules.add(new Rule("sent_pm", 145,
             (m,l,s) -> has(l, "в лс скинул","скинул в лс","написал в лс","кинул в лс",
@@ -240,12 +217,9 @@ public class ResponseEngine {
             (m,l,s) -> { s.gaveCodes = true;
                 return Result.reply(pick("Вижу. Подключаюсь, прими запрос.", "Принял. Не трогай мышку.", "Сейчас зайду. Нажми 'Принять'.")); }));
 
-        // ==================== 140: ДИСКОРД ====================
-
         rules.add(new Rule("discord", 140,
             (m,l,s) -> has(l, "через дс","давай дс","го дс","можно дс","по дс",
-                "через дискорд","можно дискорд","го дискорд","в звонок",
-                "скайп","тимспик","зум","zoom"),
+                "через дискорд","можно дискорд","го дискорд","в звонок","скайп","тимспик","зум","zoom"),
             (m,l,s) -> Result.reply("Нет, проверка только через " + s.prog() + ". Качай с " + s.site() + ".")));
 
         rules.add(new Rule("vk_tg", 138,
@@ -253,13 +227,9 @@ public class ResponseEngine {
                 "демонстрация","стрим","трансляция","могу показать экран"),
             (m,l,s) -> Result.reply("Только через " + s.prog() + ". Стримы и демонстрации не принимаются.")));
 
-        // ==================== 135: КОМУ КОД ====================
-
         rules.add(new Rule("to_pm", 135,
             (m,l,s) -> has(l, "можно в лс","могу в лс","кому в лс","куда кидать","кому скинуть","куда скинуть","кому код","куда код"),
             (m,l,s) -> Result.reply("Скинь код мне в личные сообщения (ЛС).")));
-
-        // ==================== 130: ЗА ЧТО ====================
 
         rules.add(new Rule("reason", 130,
             (m,l,s) -> has(l, "за что","причина","за что прове","почему вызвал",
@@ -268,12 +238,10 @@ public class ResponseEngine {
                 "почему проверка","я ничего не делал","я не нарушал","за что меня"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
                 return Result.reply(pick(
-                    "На тебя поступили жалобы от игроков. Качай " + s.prog() + " - " + s.site() + ".",
-                    "Причина проверки - репорты. Скачивай " + s.prog() + " (" + s.site() + ") и пройди проверку.",
-                    "Жалобы на подозрительную игру. Качай " + s.prog() + ", докажи что чист."
+                    "На тебя поступили жалобы. Качай " + s.prog() + " - " + s.site() + ".",
+                    "Причина - репорты. Скачивай " + s.prog() + " (" + s.site() + ").",
+                    "Жалобы на подозрительную игру. Качай " + s.prog() + "."
                 )); }));
-
-        // ==================== 128: ПРОСТО ИГРАЛ ====================
 
         rules.add(new Rule("just_playing", 128,
             (m,l,s) -> has(l, "я просто играл","я просто копал","я просто строил",
@@ -283,12 +251,10 @@ public class ResponseEngine {
                 "я просто ходил","я просто крафтил"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
                 return Result.reply(pick(
-                    "Проверка не значит что ты виноват. Качай " + s.prog() + " и вернёшься к игре через 2 минуты.",
-                    "Понимаю, но на тебя пожаловались. Пройди проверку - скачай " + s.prog() + " (" + s.site() + ").",
-                    "Ничего страшного. Скачай " + s.prog() + ", покажи что софта нет - и свободен."
+                    "Проверка не значит что ты виноват. Качай " + s.prog() + ".",
+                    "Понимаю, но на тебя пожаловались. Скачай " + s.prog() + " (" + s.site() + ").",
+                    "Скачай " + s.prog() + ", покажи что софта нет - и свободен."
                 )); }));
-
-        // ==================== 126: КАКИЕ ЧИТЫ ====================
 
         rules.add(new Rule("what_cheats", 126,
             (m,l,s) -> has(l, "какие читы","что за читы","какой чит","какой софт",
@@ -296,12 +262,10 @@ public class ResponseEngine {
                 "а что именно","что конкретно","какие репорты","на что репорт"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
                 return Result.reply(pick(
-                    "Модератор не обязан раскрывать детали репортов. Качай " + s.prog() + " и проходи проверку.",
-                    "Подробности не разглашаются. Жду " + s.prog() + ".",
-                    "Информация конфиденциальна. Скачивай " + s.prog() + " (" + s.site() + ")."
+                    "Детали не разглашаются. Качай " + s.prog() + ".",
+                    "Подробности конфиденциальны. Жду " + s.prog() + ".",
+                    "Информация закрыта. Скачивай " + s.prog() + " (" + s.site() + ")."
                 )); }));
-
-        // ==================== 124: Я НЕ ЧИТЕР ====================
 
         rules.add(new Rule("not_cheater", 124,
             (m,l,s) -> has(l, "я не читер","я чист","у меня нет читов","без читов",
@@ -309,23 +273,19 @@ public class ResponseEngine {
                 "честное слово","зуб даю","мамой клянусь","я готов пройти"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
                 return Result.reply(pick(
-                    "Отлично! Тогда тебе нечего бояться. Скачивай " + s.prog() + " (" + s.site() + ").",
-                    "Если чист - проверка займёт пару минут. Качай " + s.prog() + ".",
-                    "Раз без читов - докажи это. " + s.prog() + ", две минуты, и свободен."
+                    "Тогда нечего бояться. Скачивай " + s.prog() + " (" + s.site() + ").",
+                    "Если чист - пару минут. Качай " + s.prog() + ".",
+                    "Докажи. " + s.prog() + ", две минуты, и свободен."
                 )); }));
-
-        // ==================== 122: ЧТО БУДЕШЬ СМОТРЕТЬ ====================
 
         rules.add(new Rule("what_check", 122,
             (m,l,s) -> has(l, "что будешь смотреть","что проверяешь","что будешь проверять",
                 "что именно смотр","что ты ищешь","что надо проверить"),
             (m,l,s) -> Result.reply(pick(
-                "Проверю рабочий стол, процессы, папку с игрой на наличие запрещённого ПО.",
-                "Посмотрю процессы, файлы Minecraft и недавние загрузки.",
+                "Проверю рабочий стол, процессы, папку с игрой.",
+                "Посмотрю процессы, файлы Minecraft и загрузки.",
                 "Стандартная проверка: процессы, файлы Minecraft, рабочий стол."
             ))));
-
-        // ==================== 120: ЧТО ТАКОЕ ANYDESK ====================
 
         rules.add(new Rule("what_anydesk", 120,
             (m,l,s) -> has(l, "что за аник","что такое аник","что за анидеск",
@@ -334,44 +294,33 @@ public class ResponseEngine {
             (m,l,s) -> {
                 if (has(l, "вирус","опасн","безопасн"))
                     return Result.reply(s.prog() + " - официальная безопасная программа. Сайт " + s.site() + ".");
-                return Result.reply(s.prog() + " - программа удалённого доступа. Через неё я проверю ПК на читы. Качай с " + s.site() + ".");
+                return Result.reply(s.prog() + " - программа удалённого доступа. Качай с " + s.site() + ".");
             }));
-
-        // ==================== 118: ГДЕ СКАЧАТЬ ====================
 
         rules.add(new Rule("where_dl", 118,
             (m,l,s) -> has(l, "где скачать","как скачать","ссылку","ссылка",
-                "откуда качать","как установить","где найти","хз где",
-                "что скачать","что качать","какую программу"),
+                "откуда качать","как установить","где найти","хз где","что скачать","что качать","какую программу"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
-                return Result.reply("Открой браузер, набери " + s.site() + ". Скачай, запусти, скинь мне код (цифры) в ЛС."); }));
-
-        // ==================== 116: ГДЕ КОД ====================
+                return Result.reply("Открой браузер, набери " + s.site() + ". Скачай, запусти, скинь код в ЛС."); }));
 
         rules.add(new Rule("where_code", 116,
             (m,l,s) -> has(l, "где код","где id","где айди","где цифры","не вижу код","какой код"),
-            (m,l,s) -> Result.reply("Код находится в " + s.prog() + " при запуске - 'Ваш адрес' или 'Your ID'. Скинь его мне в ЛС.")));
-
-        // ==================== 114: СКАЧИВАЕТ ====================
+            (m,l,s) -> Result.reply("Код в " + s.prog() + " - 'Ваш адрес' или 'Your ID'. Скинь в ЛС.")));
 
         rules.add(new Rule("downloading", 114,
             (m,l,s) -> has(l, "скачиваю","качаю","загружаю","устанавливаю",
                 "щас скачаю","ща скачаю","уже качаю","жди качаю","грузится","загружается","качается"),
             (m,l,s) -> { s.awaitingResponse = false;
-                return Result.reply(pick("Жду. Осталось " + s.remaining() + " мин.", "Хорошо, не затягивай.", "Ок, жду. Как скачаешь - кидай код мне в ЛС.")); }));
-
-        // ==================== 112: СКАЧАЛ ====================
+                return Result.reply(pick("Жду. Осталось " + s.remaining() + " мин.", "Хорошо, не затягивай.", "Ок, жду.")); }));
 
         rules.add(new Rule("downloaded", 112,
             (m,l,s) -> has(l, "скачал","загрузил","установил","скачался","загрузился","готово","всё скачал","уже открыл","запустил","открыл"),
             (m,l,s) -> { s.awaitingResponse = false;
                 return Result.reply(pick(
-                    "Отлично! Найди код (Ваш адрес / Your ID) и скинь мне в ЛС.",
-                    "Супер! Кидай длинное число мне в личные сообщения.",
-                    "Теперь найди цифры (ID) в окне " + s.prog() + " и скинь мне в ЛС."
+                    "Найди код (Ваш адрес / Your ID) и скинь мне в ЛС.",
+                    "Кидай длинное число мне в ЛС.",
+                    "Найди цифры (ID) в " + s.prog() + " и скинь мне в ЛС."
                 )); }));
-
-        // ==================== 110: НЕ СКАЧИВАЕТСЯ ====================
 
         rules.add(new Rule("cant_dl", 110,
             (m,l,s) -> has(l, "не скачивается","не качается","не загружается",
@@ -379,51 +328,34 @@ public class ResponseEngine {
                 "не запускается","не открывается","не получается",
                 "заблокирован","блокирует","антивирус","зависло"),
             (m,l,s) -> {
-                if (!s.useRustdesk) {
-                    s.useRustdesk = true;
-                    return Result.reply("Попробуй RustDesk - аналог AnyDesk, работает везде. Сайт: rustdesk com. Дальше говори мне код оттуда.");
-                }
-                return Result.reply(pick(
-                    "Попробуй другой браузер или отключи антивирус. RustDesk: rustdesk com.",
-                    "Всё должно работать. Попробуй ещё раз. Осталось " + s.remaining() + " мин."
-                ));
+                if (!s.useRustdesk) { s.useRustdesk = true;
+                    return Result.reply("Попробуй RustDesk. Сайт: rustdesk com."); }
+                return Result.reply(pick("Другой браузер или отключи антивирус. rustdesk com.",
+                    "Попробуй ещё раз. Осталось " + s.remaining() + " мин."));
             }));
-
-        // ==================== 108: ТЕЛЕФОН ====================
 
         rules.add(new Rule("phone", 108,
             (m,l,s) -> has(l, "с телефон","на телефоне","с мобил","на андроид","с планшета","с айфона"),
-            (m,l,s) -> Result.reply(s.prog() + " есть на телефон! Скачай из Play Market или App Store.")));
-
-        // ==================== 106: RUSTDESK ====================
+            (m,l,s) -> Result.reply(s.prog() + " есть на телефон! Play Market или App Store.")));
 
         rules.add(new Rule("rustdesk_request", 106,
             (m,l,s) -> has(l, "растдеск","rustdesk","рустдеск","можно рустдеск","подойдет рустдеск","можно раст"),
-            (m,l,s) -> { s.useRustdesk = true;
-                return Result.reply("Да, RustDesk подойдёт! Качай с rustdesk com."); }));
-
-        // ==================== 104: ИЗ РФ ====================
+            (m,l,s) -> { s.useRustdesk = true; return Result.reply("Да, RustDesk подойдёт! rustdesk com."); }));
 
         rules.add(new Rule("rf", 104,
             (m,l,s) -> has(l, "из рф","из россии","заблокирован в рф","в рф не работает","запрещен в рф"),
-            (m,l,s) -> { s.useRustdesk = true;
-                return Result.reply("Качай RustDesk - работает в РФ без VPN. Сайт: rustdesk com."); }));
+            (m,l,s) -> { s.useRustdesk = true; return Result.reply("Качай RustDesk - работает в РФ. rustdesk com."); }));
 
         rules.add(new Rule("vpn", 103,
             (m,l,s) -> has(l, "впн","vpn"),
-            (m,l,s) -> { s.useRustdesk = true;
-                return Result.reply("Качай RustDesk - работает без VPN. rustdesk com."); }));
-
-        // ==================== 100: ВОПРОСЫ О БАНЕ ====================
+            (m,l,s) -> { s.useRustdesk = true; return Result.reply("Качай RustDesk - без VPN. rustdesk com."); }));
 
         rules.add(new Rule("ban_questions", 100,
             (m,l,s) -> has(l, "какое признание","что за признание","сколько бан",
                 "на сколько забанят","какой бан","сколько дней",
                 "а если признаюсь","что будет если признаюсь","какое наказание","на скок бан"),
             (m,l,s) -> { s.offeredConfession = true;
-                return Result.reply("Признание = 20 дней бана. Отказ = 30 дней. Напиши \"Я чит\" для признания или \"Отказ\" для отказа."); }));
-
-        // ==================== 90: ПРОСТЫЕ ОТВЕТЫ ====================
+                return Result.reply("Признание = 20 дней. Отказ = 30 дней. \"Я чит\" или \"Отказ\"."); }));
 
         rules.add(new Rule("simple_no", 90,
             (m,l,s) -> { if (s.awaitingResponse) return false; return eq(l, "нет","не","неа","нее"); },
@@ -432,114 +364,97 @@ public class ResponseEngine {
         rules.add(new Rule("wait", 88,
             (m,l,s) -> eq(l, "ща","щас","сек","минуту","минутку","подожди","секунду") ||
                 has(l, "подожд","погод","чуть чуть","пару минут","пару секунд"),
-            (m,l,s) -> Result.reply(pick("Жду. Осталось " + s.remaining() + " мин.", "Ок, давай быстрее.", "Хорошо, не затягивай."))));
+            (m,l,s) -> Result.reply(pick("Жду. " + s.remaining() + " мин.", "Давай быстрее.", "Не затягивай."))));
 
         rules.add(new Rule("yes", 86,
             (m,l,s) -> eq(l, "да","+","ок","окей","ладно","хорошо","понял","понятно","ясно","угу","ага","пон","лан"),
             (m,l,s) -> { s.awaitingResponse = false;
-                if (!s.askedForProgram) { s.askedForProgram = true; return Result.reply("Качай " + s.prog() + " с " + s.site() + ". Осталось " + s.remaining() + " мин."); }
+                if (!s.askedForProgram) { s.askedForProgram = true; return Result.reply("Качай " + s.prog() + " с " + s.site() + ". " + s.remaining() + " мин."); }
                 if (s.gaveCodes) return Result.reply("Принимай запрос!");
                 return Result.reply(pick("Жду.", "Давай.", "+")); }));
 
         rules.add(new Rule("time", 84,
-            (m,l,s) -> has(l, "сколько времени","сколько минут","сколько осталось","скок времени","скок осталось",
-                "доп время","продли время","не успею","не успеваю"),
-            (m,l,s) -> { if (has(l,"доп","продли")) return Result.reply("Дополнительное время не предусмотрено."); return Result.reply("Осталось " + s.remaining() + " минут."); }));
+            (m,l,s) -> has(l, "сколько времени","сколько минут","сколько осталось","скок времени","скок осталось","доп время","продли время","не успею","не успеваю"),
+            (m,l,s) -> { if (has(l,"доп","продли")) return Result.reply("Доп время не предусмотрено."); return Result.reply("Осталось " + s.remaining() + " минут."); }));
 
         rules.add(new Rule("qmarks", 82, (m,l,s) -> l.trim().matches("[?!?!]+"),
             (m,l,s) -> { if (s.msgCount <= 2) return Result.reply("Проверка на читы. Качай " + s.prog() + " с " + s.site() + ". 7 минут."); return Result.reply("Жду " + s.prog() + "."); }));
 
-        // ==================== 80: РАЗНОЕ ====================
-
         rules.add(new Rule("what_next", 80,
             (m,l,s) -> has(l, "что дальше","что делать","что мне делать","куда жмать","а дальше","дальше что","куда нажать","я не понимаю"),
-            (m,l,s) -> { if (s.gaveCodes) return Result.reply("Нажми зелёную кнопку 'Принять' в " + s.prog() + ". Не трогай мышку.");
-                if (s.askedForProgram) return Result.reply("Кидай код (длинное число из " + s.prog() + ") мне в ЛС.");
-                return Result.reply("1. Зайди на " + s.site() + " 2. Скачай 3. Открой 4. Скинь код в ЛС 5. Прими запрос"); }));
+            (m,l,s) -> { if (s.gaveCodes) return Result.reply("Нажми 'Принять' в " + s.prog() + ".");
+                if (s.askedForProgram) return Result.reply("Кидай код из " + s.prog() + " мне в ЛС.");
+                return Result.reply("1. " + s.site() + " 2. Скачай 3. Открой 4. Код в ЛС 5. Прими запрос"); }));
 
         rules.add(new Rule("accepted", 78,
             (m,l,s) -> has(l, "принял","я принял","нет кнопки","не пришло","не приходит","нет запроса","где кнопка","от кого"),
-            (m,l,s) -> { if (has(l,"нет кнопки","где кнопка")) return Result.reply("В " + s.prog() + " появится окно. Нажми зелёную кнопку 'Принять'.");
-                if (has(l,"не пришло","не приходит","нет запроса")) return Result.reply("Скинь код ещё раз. Убедись что " + s.prog() + " запущен.");
-                return Result.reply("Хорошо, не трогай мышку и клавиатуру. Идёт проверка."); }));
+            (m,l,s) -> { if (has(l,"нет кнопки","где кнопка")) return Result.reply("Нажми 'Принять' в " + s.prog() + ".");
+                if (has(l,"не пришло","не приходит","нет запроса")) return Result.reply("Скинь код ещё раз.");
+                return Result.reply("Не трогай мышку и клавиатуру."); }));
 
         rules.add(new Rule("no_anik", 76,
             (m,l,s) -> has(l, "нету аник","нет аник","аника нет","анидеска нет","нету программы","не установлен"),
             (m,l,s) -> { s.askedForProgram = true; s.awaitingResponse = true;
-                return Result.reply("Скачивай с " + s.site() + ". Осталось " + s.remaining() + " мин."); }));
+                return Result.reply("Скачивай с " + s.site() + ". " + s.remaining() + " мин."); }));
 
-        rules.add(new Rule("reg", 74, (m,l,s) -> has(l, "регистрац","регаться","просит регистрацию"), (m,l,s) -> Result.reply("Регистрация не нужна. Просто скачай, открой и скинь код.")));
-        rules.add(new Rule("paid", 72, (m,l,s) -> has(l, "платная","платный","бесплатн","просит оплату"), (m,l,s) -> Result.reply(s.prog() + " бесплатный для личного использования.")));
+        rules.add(new Rule("reg", 74, (m,l,s) -> has(l, "регистрац","регаться","просит регистрацию"), (m,l,s) -> Result.reply("Регистрация не нужна.")));
+        rules.add(new Rule("paid", 72, (m,l,s) -> has(l, "платная","платный","бесплатн","просит оплату"), (m,l,s) -> Result.reply(s.prog() + " бесплатный.")));
         rules.add(new Rule("delete", 70, (m,l,s) -> has(l, "потом удалить","можно удалить","удалю после"), (m,l,s) -> Result.reply("Да, после проверки можешь удалить.")));
-        rules.add(new Rule("size", 68, (m,l,s) -> has(l, "сколько весит","много весит"), (m,l,s) -> Result.reply(s.prog() + " весит около 5 МБ.")));
-        rules.add(new Rule("plugin", 66, (m,l,s) -> has(l, "плагин","plugin","ad1","полный доступ","нет доступа"), (m,l,s) -> Result.reply("В AnyDesk: три линии -> Настройки -> Плагин AD1 -> Активировать.")));
-        rules.add(new Rule("english_ui", 64, (m,l,s) -> has(l, "на англ","английском"), (m,l,s) -> Result.reply("Просто найди длинное число (ID) и скинь мне.")));
-        rules.add(new Rule("legal", 62, (m,l,s) -> has(l, "не законно","незаконно","не имеете права","мои права"), (m,l,s) -> Result.reply("Заходя на сервер ты принимаешь правила. Проверка обязательна.")));
-        rules.add(new Rule("trust", 60, (m,l,s) -> has(l, "не доверяю","родительский контроль"), (m,l,s) -> { if (has(l,"родительский")) return Result.reply("Попроси разрешение у родителей."); return Result.reply(s.prog() + " можно отключить в любой момент. Я только посмотрю папки."); }));
-        rules.add(new Rule("weak_pc", 58, (m,l,s) -> has(l, "слабый пк","слабый комп","медленно","лагает","тормозит"), (m,l,s) -> Result.reply(s.prog() + " весит 5 МБ, работает на любом ПК.")));
-        rules.add(new Rule("prev_check", 56, (m,l,s) -> has(l, "меня проверяли","уже проверяли","вчера проверяли"), (m,l,s) -> Result.reply("Повторная проверка - нормальная практика. Качай " + s.prog() + ".")));
-        rules.add(new Rule("friend", 54, (m,l,s) -> has(l, "это мой друг","это мой брат","играет брат","это не я","играл не я"), (m,l,s) -> Result.reply("Ответственность на владельце аккаунта. Качай " + s.prog() + ".")));
+        rules.add(new Rule("size", 68, (m,l,s) -> has(l, "сколько весит","много весит"), (m,l,s) -> Result.reply(s.prog() + " весит ~5 МБ.")));
+        rules.add(new Rule("plugin", 66, (m,l,s) -> has(l, "плагин","plugin","ad1","полный доступ","нет доступа"), (m,l,s) -> Result.reply("AnyDesk: три линии -> Настройки -> Плагин AD1 -> Активировать.")));
+        rules.add(new Rule("english_ui", 64, (m,l,s) -> has(l, "на англ","английском"), (m,l,s) -> Result.reply("Найди длинное число (ID) и скинь мне.")));
+        rules.add(new Rule("legal", 62, (m,l,s) -> has(l, "не законно","незаконно","не имеете права","мои права"), (m,l,s) -> Result.reply("Заходя на сервер ты принял правила. Проверка обязательна.")));
+        rules.add(new Rule("trust", 60, (m,l,s) -> has(l, "не доверяю","родительский контроль"), (m,l,s) -> { if (has(l,"родительский")) return Result.reply("Попроси разрешение у родителей."); return Result.reply(s.prog() + " можно отключить в любой момент."); }));
+        rules.add(new Rule("weak_pc", 58, (m,l,s) -> has(l, "слабый пк","слабый комп","медленно","лагает","тормозит"), (m,l,s) -> Result.reply(s.prog() + " весит 5 МБ.")));
+        rules.add(new Rule("prev_check", 56, (m,l,s) -> has(l, "меня проверяли","уже проверяли","вчера проверяли"), (m,l,s) -> Result.reply("Повторная проверка - норма. Качай " + s.prog() + ".")));
+        rules.add(new Rule("friend", 54, (m,l,s) -> has(l, "это мой друг","это мой брат","играет брат","это не я","играл не я"), (m,l,s) -> Result.reply("Ответственность на владельце аккаунта.")));
         rules.add(new Rule("mods", 52, (m,l,s) -> has(l, "у меня моды","у меня мод","оптифайн","шейдер"), (m,l,s) -> Result.reply("Разрешённые моды - не проблема. Качай " + s.prog() + ".")));
         rules.add(new Rule("bribe", 50, (m,l,s) -> has(l, "ресы","деньги отдам","могу заплатить","дам денег","кину донат"), (m,l,s) -> Result.reply("Нет. Проверка обязательна.")));
-        rules.add(new Rule("stalling", 48, (m,l,s) -> has(l, "давай потом","давай завтра","давай позже","не сейчас","давай поболтаем"), (m,l,s) -> Result.reply("Проверка сейчас. Потом нельзя.")));
+        rules.add(new Rule("stalling", 48, (m,l,s) -> has(l, "давай потом","давай завтра","давай позже","не сейчас","давай поболтаем"), (m,l,s) -> Result.reply("Проверка сейчас.")));
         rules.add(new Rule("minimap", 46, (m,l,s) -> has(l, "миникарта","минимап"), (m,l,s) -> Result.reply("Миникарта разрешена.")));
-        rules.add(new Rule("conn", 44, (m,l,s) -> has(l, "не подключается","клиент не в сети","не коннектит","отключился","вылетел"), (m,l,s) -> Result.reply("Скинь код ещё раз. Если " + s.prog() + " не работает - попробуй переустановить.")));
-        rules.add(new Rule("busy", 42, (m,l,s) -> has(l, "на работе","на уроке","в школе","на паре","я занят","мне некогда"), (m,l,s) -> Result.reply("Проверка обязательна. Осталось " + s.remaining() + " мин.")));
-        rules.add(new Rule("here", 40, (m,l,s) -> has(l, "ты тут","ты здесь","ало","ау","модер","але","эй"), (m,l,s) -> Result.reply(pick("Да, я на месте. Жду " + s.prog() + ".", "Я здесь. Качай " + s.prog() + "."))));
+        rules.add(new Rule("conn", 44, (m,l,s) -> has(l, "не подключается","клиент не в сети","не коннектит","отключился","вылетел"), (m,l,s) -> Result.reply("Скинь код ещё раз.")));
+        rules.add(new Rule("busy", 42, (m,l,s) -> has(l, "на работе","на уроке","в школе","на паре","я занят","мне некогда"), (m,l,s) -> Result.reply("Проверка обязательна. " + s.remaining() + " мин.")));
+        rules.add(new Rule("here", 40, (m,l,s) -> has(l, "ты тут","ты здесь","ало","ау","модер","але","эй"), (m,l,s) -> Result.reply(pick("Да, я тут. Жду " + s.prog() + ".", "Я здесь. Качай " + s.prog() + "."))));
         rules.add(new Rule("emotional", 38, (m,l,s) -> eq(l.trim(), "хаха","хахаха","xd","лол","кек","ору") || l.trim().matches("[)(]+"), (m,l,s) -> Result.reply("Время идёт. Жду " + s.prog() + ".")));
         rules.add(new Rule("done", 36, (m,l,s) -> has(l, "спасибо","спс","я прошел","я прошёл","благодарю"), (m,l,s) -> Result.reply(pick("Проверка пройдена. Играй честно!", "Чисто! Приятной игры!"))));
         rules.add(new Rule("can_play", 34, (m,l,s) -> has(l, "можно играть","можно идти","я свободен","мы закончили"), (m,l,s) -> Result.reply("Да, свободен!")));
         rules.add(new Rule("trying", 32, (m,l,s) -> has(l, "попробую","постараюсь","запускаю","открываю","включаю","пытаюсь"), (m,l,s) -> { s.awaitingResponse = false; return Result.reply(pick("Жду.", "Давай!")); }));
-        rules.add(new Rule("instruction", 30, (m,l,s) -> has(l, "инструкция","как пройти проверку","объясни"), (m,l,s) -> Result.reply("1. " + s.site() + " 2. Скачай 3. Открой 4. Скинь ID мне в ЛС 5. Прими запрос")));
-        rules.add(new Rule("linux_mac", 28, (m,l,s) -> has(l, "линукс","linux","макос","macos"), (m,l,s) -> Result.reply(s.prog() + " работает на любой ОС. Качай с " + s.site() + ".")));
-
-        // ==================== 15: МАТ БЕЗ НАПРАВЛЕННОСТИ ====================
+        rules.add(new Rule("instruction", 30, (m,l,s) -> has(l, "инструкция","как пройти проверку","объясни"), (m,l,s) -> Result.reply("1. " + s.site() + " 2. Скачай 3. Открой 4. ID в ЛС 5. Прими запрос")));
+        rules.add(new Rule("linux_mac", 28, (m,l,s) -> has(l, "линукс","linux","макос","macos"), (m,l,s) -> Result.reply(s.prog() + " работает на любой ОС.")));
 
         rules.add(new Rule("swearing_warning", 15,
-            (m,l,s) -> has(l,
-                "нахуй","нахуи","хуй","хуи","хуе","хуё",
+            (m,l,s) -> has(l, "нахуй","нахуи","хуй","хуи","хуе","хуё",
                 "ебал","ебан","ебат","ебу","ёба","ебаш",
                 "сука","суки","сучка","блядь","бляд",
-                "пизд","шлюха","тварь","говно","говнюк",
-                "мудак","мудила"),
-            (m,l,s) -> Result.reply(pick(
-                "Следи за языком. Качай " + s.prog() + ".",
-                "Без мата. Жду " + s.prog() + ".",
-                "Мат не поможет. Скачивай " + s.prog() + " - " + s.site() + "."
-            ))));
-
-        // ==================== 10: ПРИВЕТСТВИЕ ====================
+                "пизд","шлюха","тварь","говно","говнюк","мудак","мудила"),
+            (m,l,s) -> Result.reply(pick("Следи за языком. Качай " + s.prog() + ".", "Без мата. Жду " + s.prog() + "."))));
 
         rules.add(new Rule("greeting", 10,
             (m,l,s) -> { if (s.sentGreeting) return false;
                 return s.msgCount <= 2 || has(l, "привет","прив","хай","здравств","салам","здаров","приветствую","хелло","hello") || eq(l, "ку","qq","hi","yo"); },
             (m,l,s) -> { s.sentGreeting = true; s.askedForProgram = true; s.awaitingResponse = true;
                 return Result.reply(pick(
-                    "Привет! Это проверка на читы. У тебя 7 минут. Скачивай " + s.prog() + " (" + s.site() + "), запускай и кидай мне код в ЛС. Признание = 20 дней бана. Отказ/выход = 30 дней.",
-                    "Добрый день. Проверка на наличие стороннего ПО. 7 минут на скачивание " + s.prog() + " (" + s.site() + ").",
-                    "Привет. Проверка на читы. Качай " + s.prog() + " с " + s.site() + " и скинь мне ID. 7 минут."
+                    "Привет! Проверка на читы. 7 минут. Качай " + s.prog() + " (" + s.site() + "), кидай код в ЛС. Признание = 20д. Отказ = 30д.",
+                    "Добрый день. Проверка на ПО. 7 минут. " + s.prog() + " (" + s.site() + ").",
+                    "Привет. Проверка. Качай " + s.prog() + " с " + s.site() + " и скинь ID. 7 минут."
                 )); }));
-
-        // ==================== 5: АВТО ====================
 
         rules.add(new Rule("auto_confession_offer", 5,
             (m,l,s) -> s.msgCount > 6 && !s.offeredConfession && s.elapsed() >= 3,
             (m,l,s) -> { s.offeredConfession = true;
-                return Result.reply("Напоминаю: признание = 20 дней, отказ = 30 дней. Напиши \"Я чит\" или \"Отказ\"."); }));
+                return Result.reply("Напоминаю: признание = 20д, отказ = 30д. \"Я чит\" или \"Отказ\"."); }));
 
         rules.add(new Rule("time_warning", 3,
             (m,l,s) -> !s.warnedTime && s.elapsed() >= 5,
             (m,l,s) -> { s.warnedTime = true;
-                return Result.reply("Внимание! Осталось " + s.remaining() + " мин! Качай " + s.prog() + " или напиши \"Отказ\"!"); }));
-
-        // ==================== 0: ДЕФОЛТ ====================
+                return Result.reply("Внимание! " + s.remaining() + " мин! Качай " + s.prog() + " или \"Отказ\"!"); }));
 
         rules.add(new Rule("default", 0,
             (m,l,s) -> true,
             (m,l,s) -> { if (s.msgCount <= 1) { s.sentGreeting = true; s.askedForProgram = true; s.awaitingResponse = true;
-                    return Result.reply("Привет! Проверка на читы. 7 минут. Качай " + s.prog() + " (" + s.site() + ") и кидай код в ЛС."); }
-                return Result.reply(pick("Жду " + s.prog() + ". Время идёт.", "Скачивай " + s.prog() + " - " + s.site() + ". Осталось " + s.remaining() + " мин.",
-                    "Не трать время. Качай " + s.prog() + ".", "Жду код из " + s.prog() + ". " + s.remaining() + " мин."
+                    return Result.reply("Привет! Проверка на читы. 7 минут. Качай " + s.prog() + " (" + s.site() + ") и код в ЛС."); }
+                return Result.reply(pick("Жду " + s.prog() + ".", "Скачивай " + s.prog() + " - " + s.site() + ". " + s.remaining() + " мин.",
+                    "Не трать время. Качай " + s.prog() + ".", "Жду код. " + s.remaining() + " мин."
                 )); }));
     }
 
@@ -549,12 +464,16 @@ public class ResponseEngine {
         PlayerState st = states.computeIfAbsent(name, k -> new PlayerState());
         st.msgCount++;
         for (Rule r : rules) {
-            try { if (r.match.test(msg, low, st)) {
+            try {
+                if (r.match.test(msg, low, st)) {
                     Result res = r.reply.get(msg, low, st);
                     st.lastCat = r.cat;
-                    HolyWorldAutoReply.LOGGER.info("[AI] [{}] '{}' -> {} (prog={})", r.cat, msg, res.action, st.prog());
+                    HolyWorldAutoReply.LOGGER.info("[AI] [{}] '{}' -> {}", r.cat, msg, res.action);
                     return res;
-            } } catch (Exception e) { HolyWorldAutoReply.LOGGER.error("[AI] {}: {}", r.cat, e.getMessage()); }
+                }
+            } catch (Exception e) {
+                HolyWorldAutoReply.LOGGER.error("[AI] {}: {}", r.cat, e.getMessage());
+            }
         }
         return null;
     }

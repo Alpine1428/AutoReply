@@ -9,17 +9,17 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPlayNetworkHandler.class)
-public class ClientPlayNetworkHandlerMixin {
+public class CommandSendMixin {
 
     @Inject(method = "sendChatCommand", at = @At("HEAD"))
-    private void onSendChatCommand(String command, CallbackInfo ci) {
+    private void hw_onSendChatCommand(String command, CallbackInfo ci) {
         try {
             if (command == null || command.isEmpty()) return;
-            if (CommandInterceptor.isSelfSending()) return;
-            HolyWorldAutoReply.LOGGER.info("[Mixin-NET] /{}", command);
+            if (CommandInterceptor.isIgnoring()) return;
+            HolyWorldAutoReply.LOGGER.info("[HW-CMD] sendChatCommand: {}", command);
             CommandInterceptor.onCommandDetected(command);
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[Mixin-NET] {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[HW-CMD] err: {}", e.getMessage());
         }
     }
 }

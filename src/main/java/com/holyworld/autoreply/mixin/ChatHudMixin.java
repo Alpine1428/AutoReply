@@ -17,16 +17,16 @@ public class ChatHudMixin {
         method = "addMessage(Lnet/minecraft/text/Text;Lnet/minecraft/network/message/MessageSignatureData;Lnet/minecraft/client/gui/hud/MessageIndicator;)V",
         at = @At("HEAD")
     )
-    private void onAddMessage(Text message, @Nullable MessageSignatureData sig, @Nullable MessageIndicator ind, CallbackInfo ci) {
+    private void hw_onAddMessage(Text message, @Nullable MessageSignatureData sig, @Nullable MessageIndicator ind, CallbackInfo ci) {
         try {
             if (message == null) return;
             String plain = message.getString();
             if (plain != null && plain.contains("[CHECK]") && HolyWorldAutoReply.getChatHandler() != null) {
-                HolyWorldAutoReply.LOGGER.info("[Mixin-CHAT] {}", plain);
+                HolyWorldAutoReply.LOGGER.info("[HW-HUD] {}", plain);
                 HolyWorldAutoReply.getChatHandler().processIncoming(plain);
             }
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[Mixin-CHAT] {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[HW-HUD] {}", e.getMessage());
         }
     }
 }
