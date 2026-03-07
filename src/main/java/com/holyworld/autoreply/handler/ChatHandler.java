@@ -97,11 +97,14 @@ public class ChatHandler {
 
     private void performBan(String time, String reason, String nick) {
         HolyWorldAutoReply.LOGGER.info("[Chat] БАН: {} {} ({})", time, reason, nick);
+        // Сохраняем ник в lastSpyNick тоже, чтобы endcheckout работал
+        HolyWorldAutoReply.getConfig().setLastSpyNick(nick);
         CommandInterceptor.sendOwnCommand("hm sban " + time + " " + reason, 500);
         scheduler.schedule(() -> {
-            HolyWorldAutoReply.getConfig().endCheck();
+            ModConfig cfg = HolyWorldAutoReply.getConfig();
+            cfg.endCheck();
             engine.clearPlayerState(nick);
-            if (HolyWorldAutoReply.getConfig().isAutoOut()) {
+            if (cfg.isAutoOut()) {
                 CommandInterceptor.sendOwnCommand("hm endcheckout ban " + nick + " false", 1500);
             }
         }, 1200, TimeUnit.MILLISECONDS);

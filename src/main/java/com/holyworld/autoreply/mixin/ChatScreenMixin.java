@@ -16,10 +16,10 @@ public class ChatScreenMixin {
             if (message == null || !message.startsWith("/")) return;
             if (CommandInterceptor.isIgnoring()) return;
             String cmd = message.substring(1);
-            HolyWorldAutoReply.LOGGER.info("[HW-CHAT] sendMessage cmd: {}", cmd);
+            HolyWorldAutoReply.LOGGER.info("[HW-SCREEN] Команда из чата: {}", cmd);
             CommandInterceptor.onCommandDetected(cmd);
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[HW-CHAT] err: {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[HW-SCREEN] Ошибка: {}", e.getMessage());
         }
     }
 }

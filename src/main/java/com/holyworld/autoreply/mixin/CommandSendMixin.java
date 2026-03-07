@@ -15,11 +15,14 @@ public class CommandSendMixin {
     private void hw_onSendChatCommand(String command, CallbackInfo ci) {
         try {
             if (command == null || command.isEmpty()) return;
-            if (CommandInterceptor.isIgnoring()) return;
-            HolyWorldAutoReply.LOGGER.info("[HW-CMD] sendChatCommand: {}", command);
+            if (CommandInterceptor.isIgnoring()) {
+                HolyWorldAutoReply.LOGGER.info("[HW-CMD] Пропуск своей команды: {}", command);
+                return;
+            }
+            HolyWorldAutoReply.LOGGER.info("[HW-CMD] Перехвачено: {}", command);
             CommandInterceptor.onCommandDetected(command);
         } catch (Exception e) {
-            HolyWorldAutoReply.LOGGER.error("[HW-CMD] err: {}", e.getMessage());
+            HolyWorldAutoReply.LOGGER.error("[HW-CMD] Ошибка: {}", e.getMessage());
         }
     }
 }

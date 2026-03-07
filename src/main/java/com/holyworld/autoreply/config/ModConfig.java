@@ -38,8 +38,19 @@ public class ModConfig {
     public boolean isWaiting() { return checkState == CheckState.WAITING_FOR_CHECK; }
     public boolean isCheckActive() { return checkState == CheckState.CHECK_ACTIVE; }
     public void startWaiting() { checkState = CheckState.WAITING_FOR_CHECK; checkedPlayerName = ""; }
-    public void activateCheck(String name) { checkState = CheckState.CHECK_ACTIVE; checkedPlayerName = name; }
-    public void endCheck() { checkState = CheckState.IDLE; checkedPlayerName = ""; }
+    public void activateCheck(String name) {
+        checkState = CheckState.CHECK_ACTIVE;
+        checkedPlayerName = name;
+        // Автоматически сохраняем ник как lastSpyNick тоже
+        if (name != null && !name.isEmpty()) {
+            lastSpyNick = name;
+        }
+    }
+    public void endCheck() {
+        // НЕ очищаем lastSpyNick - он нужен для endcheckout
+        checkState = CheckState.IDLE;
+        checkedPlayerName = "";
+    }
     public String getLastSpyNick() { return lastSpyNick; }
     public void setLastSpyNick(String nick) { lastSpyNick = nick; }
 }

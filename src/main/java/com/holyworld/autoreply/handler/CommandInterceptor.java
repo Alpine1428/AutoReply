@@ -17,24 +17,31 @@ public class CommandInterceptor {
 
     private static final AtomicBoolean ignoring = new AtomicBoolean(false);
 
-    private static volatile long lastBanipTime = 0;
-    private static volatile long lastSbanTime = 0;
-    private static volatile long lastSpyfrzTime = 0;
+    // Дедупликация
+    private static volatile String lastDetectedCmd = "";
+    private static volatile long lastDetectedTime = 0;
 
     public static boolean isIgnoring() {
         return ignoring.get();
     }
 
     /**
-     * Единая точка входа для обнаруженных команд.
-     * Вызывается из ChatScreenMixin и CommandSendMixin.
-     * Команда приходит БЕЗ слеша.
+     * Вызывается из миксинов. Команда БЕЗ слеша.
      */
     public static void onCommandDetected(String command) {
         if (command == null || command.isEmpty()) return;
 
         String lower = command.toLowerCase().trim();
         long now = System.currentTimeMillis();
+
+        // Дедупликация - если та же команда за 1 секунду, пропускаем
+        if (lower.equals(lastDetectedCmd) && (now - lastDetectedTime) < 1000) {
+            HolyWorldAutoReply.LOGGER.info("[CMD] Дубль пропущен: {}", lower);
+            return;
+        }
+        lastDetectedCmd = lower;
+        lastDetectedTime = now;
+
         ModConfig cfg = HolyWorldAutoReply.getConfig();
 
         // ======= hm spy <nick> (не spyfrz) =======
@@ -45,20 +52,18 @@ public class CommandInterceptor {
                 if (!nick.isEmpty()) {
                     cfg.setLastSpyNick(nick);
                     localMsg("\u00a7e[HW] \u00a77Ник: \u00a7f" + nick);
-                    HolyWorldAutoReply.LOGGER.info("[CMD] spy nick={}", nick);
+                    HolyWorldAutoReply.LOGGER.info("[CMD] spy -> {}", nick);
                 }
             }
+            return;
         }
 
         // ======= hm spyfrz =======
         if (lower.startsWith("hm spyfrz")) {
-            if (now - lastSpyfrzTime < 2000) return;
-            lastSpyfrzTime = now;
-
             cfg.startWaiting();
             HolyWorldAutoReply.getChatHandler().getResponseEngine().clearAllStates();
             localMsg("\u00a7a[HW] \u00a77Ожидание [CHECK]...");
-            HolyWorldAutoReply.LOGGER.info("[CMD] spyfrz - ожидание");
+            HolyWorldAutoReply.LOGGER.info("[CMD] spyfrz");
 
             String nick = cfg.getLastSpyNick();
             if (nick != null && !nick.isEmpty()) {
@@ -72,74 +77,112 @@ public class CommandInterceptor {
                     sendOwnCommand(ac, 600);
                 }
             }
+            return;
         }
 
         // ======= hm sban =======
         if (lower.startsWith("hm sban")) {
-            if (now - lastSbanTime < 2000) return;
-            lastSbanTime = now;
             HolyWorldAutoReply.LOGGER.info("[CMD] sban обнаружен");
-            finishCheck(cfg, "sban");
+            handleBanDetected(cfg, "sban", command);
+            return;
         }
 
-        // ======= banip (любые аргументы) =======
+        // ======= banip (ЛЮБЫЕ аргументы после) =======
         if (lower.startsWith("banip")) {
-            if (now - lastBanipTime < 2000) return;
-            lastBanipTime = now;
-            HolyWorldAutoReply.LOGGER.info("[CMD] banip обнаружен: {}", command);
-            finishCheck(cfg, "banip");
+            HolyWorldAutoReply.LOGGER.info("[CMD] === BANIP ОБНАРУЖЕН === : {}", command);
+            handleBanDetected(cfg, "banip", command);
+            return;
         }
 
         // ======= hm unfrz / hm unfreezing =======
         if (lower.startsWith("hm unfrz") || lower.startsWith("hm unfreezing")) {
             HolyWorldAutoReply.LOGGER.info("[CMD] unfrz обнаружен");
+            // Просто завершаем проверку без endcheckout
             if (!cfg.isIdle()) {
                 cfg.endCheck();
                 HolyWorldAutoReply.getChatHandler().getResponseEngine().clearAllStates();
                 localMsg("\u00a7e[HW] \u00a77Проверка завершена (unfrz).");
             }
-        }
-    }
-
-    private static void finishCheck(ModConfig cfg, String source) {
-        String lastNick = cfg.getCheckedPlayerName();
-        if (lastNick == null || lastNick.isEmpty()) {
-            lastNick = cfg.getLastSpyNick();
-        }
-
-        if (!cfg.isIdle()) {
-            cfg.endCheck();
-            HolyWorldAutoReply.getChatHandler().getResponseEngine().clearAllStates();
-            localMsg("\u00a7e[HW] \u00a77Проверка завершена (" + source + ").");
-            HolyWorldAutoReply.LOGGER.info("[CMD] Проверка завершена ({}), ник={}", source, lastNick);
-        }
-
-        if (cfg.isAutoOut() && lastNick != null && !lastNick.isEmpty()) {
-            String ec = "hm endcheckout ban " + lastNick + " false";
-            localMsg("\u00a7a[HW] \u00a77Авто: \u00a7f/" + ec);
-            sendOwnCommand(ec, 2500);
+            return;
         }
     }
 
     /**
-     * Отправка команды от имени мода. 
-     * Устанавливает флаг ignoring чтобы миксины не перехватывали.
+     * Обработка бана (sban или banip).
+     * ВСЕГДА пытается отправить endcheckout если есть ник.
+     */
+    private static void handleBanDetected(ModConfig cfg, String source, String fullCommand) {
+        // Сохраняем ник ДО очистки
+        String nick = cfg.getCheckedPlayerName();
+        HolyWorldAutoReply.LOGGER.info("[CMD] handleBan src={} checkedPlayer='{}' lastSpy='{}' idle={} autoOut={}",
+            source, nick, cfg.getLastSpyNick(), cfg.isIdle(), cfg.isAutoOut());
+
+        if (nick == null || nick.isEmpty()) {
+            nick = cfg.getLastSpyNick();
+            HolyWorldAutoReply.LOGGER.info("[CMD] Используем lastSpyNick: '{}'", nick);
+        }
+
+        // Завершаем проверку если активна
+        if (!cfg.isIdle()) {
+            cfg.endCheck();
+            HolyWorldAutoReply.getChatHandler().getResponseEngine().clearAllStates();
+            localMsg("\u00a7e[HW] \u00a77Проверка завершена (" + source + ").");
+            HolyWorldAutoReply.LOGGER.info("[CMD] Проверка завершена ({})", source);
+        } else {
+            HolyWorldAutoReply.LOGGER.info("[CMD] Проверка уже была idle, но всё равно пробуем endcheckout");
+        }
+
+        // ВСЕГДА пытаемся endcheckout если есть ник и autoOut включен
+        if (cfg.isAutoOut()) {
+            if (nick != null && !nick.isEmpty()) {
+                final String finalNick = nick;
+                String ec = "hm endcheckout ban " + finalNick + " false";
+                localMsg("\u00a7a[HW] \u00a77Авто endcheckout: \u00a7f/" + ec);
+                HolyWorldAutoReply.LOGGER.info("[CMD] Отправляю endcheckout: {}", ec);
+                sendOwnCommand(ec, 2000);
+            } else {
+                localMsg("\u00a7c[HW] \u00a77Нет ника для endcheckout!");
+                HolyWorldAutoReply.LOGGER.warn("[CMD] Нет ника для endcheckout! checkedPlayer='{}' lastSpy='{}'",
+                    cfg.getCheckedPlayerName(), cfg.getLastSpyNick());
+            }
+        } else {
+            HolyWorldAutoReply.LOGGER.info("[CMD] autoOut выключен, endcheckout не отправляем");
+        }
+    }
+
+    /**
+     * Отправка своей команды с флагом ignoring.
      */
     public static void sendOwnCommand(String cmd, long delayMs) {
+        HolyWorldAutoReply.LOGGER.info("[CMD] Планирую отправку через {}мс: /{}", delayMs, cmd);
         scheduler.schedule(() -> {
             MinecraftClient c = MinecraftClient.getInstance();
-            if (c == null || c.player == null || c.getNetworkHandler() == null) return;
+            if (c == null) {
+                HolyWorldAutoReply.LOGGER.error("[CMD] MinecraftClient == null!");
+                return;
+            }
+            if (c.player == null) {
+                HolyWorldAutoReply.LOGGER.error("[CMD] player == null!");
+                return;
+            }
+            if (c.getNetworkHandler() == null) {
+                HolyWorldAutoReply.LOGGER.error("[CMD] networkHandler == null!");
+                return;
+            }
             c.execute(() -> {
-                ignoring.set(true);
                 try {
+                    HolyWorldAutoReply.LOGGER.info("[CMD] >>> Отправляю: /{}", cmd);
+                    ignoring.set(true);
                     c.getNetworkHandler().sendChatCommand(cmd);
-                    HolyWorldAutoReply.LOGGER.info("[CMD] Отправлено: /{}", cmd);
+                    HolyWorldAutoReply.LOGGER.info("[CMD] >>> Отправлено успешно: /{}", cmd);
                 } catch (Exception e) {
-                    HolyWorldAutoReply.LOGGER.error("[CMD] Ошибка отправки: {}", e.getMessage());
+                    HolyWorldAutoReply.LOGGER.error("[CMD] >>> Ошибка отправки /{}: {}", cmd, e.getMessage());
                 } finally {
-                    // Сбрасываем флаг через небольшую задержку
-                    // чтобы mixin точно успел пропустить
-                    scheduler.schedule(() -> ignoring.set(false), 100, TimeUnit.MILLISECONDS);
+                    // Сбрасываем через 200мс
+                    scheduler.schedule(() -> {
+                        ignoring.set(false);
+                        HolyWorldAutoReply.LOGGER.info("[CMD] ignoring сброшен");
+                    }, 200, TimeUnit.MILLISECONDS);
                 }
             });
         }, delayMs, TimeUnit.MILLISECONDS);
