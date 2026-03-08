@@ -1,6 +1,7 @@
 package com.holyworld.autoreply.mixin;
 
 import com.holyworld.autoreply.HolyWorldAutoReply;
+import com.holyworld.autoreply.handler.ChatHandler;
 import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.gui.hud.MessageIndicator;
 import net.minecraft.network.message.MessageSignatureData;
@@ -21,10 +22,23 @@ public class ChatHudMixin {
         try {
             if (message == null) return;
             String plain = message.getString();
-            if (plain != null && plain.contains("[CHECK]") && HolyWorldAutoReply.getChatHandler() != null) {
-                HolyWorldAutoReply.LOGGER.info("[HW-HUD] {}", plain);
-                HolyWorldAutoReply.getChatHandler().processIncoming(plain);
+            if (plain == null || plain.isEmpty()) return;
+
+            ChatHandler handler = HolyWorldAutoReply.getChatHandler();
+            if (handler == null) return;
+
+            // Перехват [CHECK] сообщений
+            if (plain.contains("[CHECK]")) {
+                HolyWorldAutoReply.LOGGER.info("[HW-HUD] CHECK: {}", plain);
+                handler.processIncoming(plain);
             }
+
+            // Перехват [Тихий] бана за лив с проверки
+            if (plain.contains("[Тихий]")) {
+                HolyWorldAutoReply.LOGGER.info("[HW-HUD] Тихий: {}", plain);
+                handler.processSilentBan(plain);
+            }
+
         } catch (Exception e) {
             HolyWorldAutoReply.LOGGER.error("[HW-HUD] {}", e.getMessage());
         }
